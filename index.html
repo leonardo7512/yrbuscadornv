@@ -288,10 +288,10 @@
                         <span>📋</span> Todas mis NV
                     </button>
                     <button class="btn btn-secondary" onclick="buscarPendientes()">
-                        <span>⏳</span> Pendientes
+                        <span>⏳</span> Por Definir
                     </button>
                     <button class="btn btn-secondary" onclick="buscarCompletadas()">
-                        <span>✅</span> Completadas
+                        <span>✅</span> Despacho Definido
                     </button>
                 </div>
 
@@ -591,7 +591,7 @@
             datosCompletos = [
                 ['2025-08-20 14:30', '25610', '20', 'YR', 'PAGADO', 'Transferencia', 'Foto NV1', '', '', 'YRT', '25610', 'NV', 'YR', 'AM', '2025-08-20 14:45:01', 'Productos de limpieza hogar', '2025-08-20 14:45:01', 'Doc', 'F1', 'F2', '', '', '', '', '', '', '', '', 'AM', 'Cliente Martinez', 'Retiro', '', '1', '2025-08-20', ''],
                 ['2025-08-20 13:15', '25605', '19', 'YR', 'PAGADO', 'Efectivo', 'Foto NV1', '', '', 'YRT', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Lopez familia', 'Envío', 'STARKEN', '1', '2025-08-20', ''],
-                ['2025-08-20 12:00', '25600', '18', 'YR', 'PENDIENTE', 'Por confirmar', 'Foto NV1', '', '', 'YRT', '25600', 'NV', 'YR', 'CQ', '2025-08-20 12:30:30', 'Artículos de oficina', '2025-08-20 12:30:30', 'Doc', 'F1', '', '', '', '', '', '', '', '', '', 'CQ', 'Empresa ABC', 'Envío', 'BLUE', '2', '2025-08-20', '']
+                ['2025-08-20 12:00', '25600', '18', 'YR', 'PENDIENTE', 'Por confirmar', 'Foto NV1', '', '', 'YRT', '25600', 'NV', 'YR', 'CQ', '2025-08-20 12:30:30', 'Artículos de oficina', '2025-08-20 12:30:30', 'Doc', 'F1', '', '', '', '', '', '', '', '', '', 'CQ', 'Empresa ABC', '', '', '', '', '']
             ];
 
             encabezados = ['FECHA', 'Numero NV', 'Turno NV', 'Vendedor NV', 'Status NV', 'Observaciones NV', 'Foto NV 1 Link', 'Foto NV 2 Link', 'Foto NV 3 Link', 'Usuario', 'Numero NV 2', 'Origen', 'Vendedor', 'Ejecutor', 'FECHA', 'Descripción', 'Fecha Verif', 'Doc PPAL', 'Foto 1', 'Foto 2', 'Foto 3', 'Foto 4', 'Foto 5', 'Foto 6', 'Foto 7', 'Foto 8', 'Foto 9', 'Foto 10', 'ENTREGADO POR', 'RECIBIDO POR', 'FOTO 1 ENTREGA', 'FOTO 2 ENT', 'FOTO 3 ENT', 'ENTREGADO EL', 'ARMADO POR', 'CLIENTE', 'TIPO DE ENVIO', 'COURRIER', 'BULTOS', 'FECHA', 'Reporte Impreso'];
@@ -656,15 +656,16 @@
             const misNV = datosCompletos.filter(row => {
                 const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
                 const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
-                const tieneEntrega = row[28] && row[28].toString().trim() !== '';
+                // ARREGLO: Chequear si el despacho está definido (columna 36) en vez de si fue entregado.
+                const despachoDefinido = row[36] && row[36].toString().trim() !== '';
                 
-                return (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) && !tieneEntrega;
+                return (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) && !despachoDefinido;
             });
 
             if (misNV.length > 0) {
-                mostrarListaNV(misNV, `⏳ NV Pendientes del vendedor ${VENDEDOR} (${misNV.length} encontradas)`);
+                mostrarListaNV(misNV, `⏳ NV Por Definir del vendedor ${VENDEDOR} (${misNV.length} encontradas)`);
             } else {
-                mostrarInfo(`✅ No hay NV pendientes para el vendedor ${VENDEDOR}.`);
+                mostrarInfo(`✅ No hay NV con despacho por definir para el vendedor ${VENDEDOR}.`);
             }
         }
 
@@ -672,15 +673,16 @@
             const misNV = datosCompletos.filter(row => {
                 const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
                 const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
-                const tieneEntrega = row[28] && row[28].toString().trim() !== '';
+                 // ARREGLO: Chequear si el despacho está definido (columna 36).
+                const despachoDefinido = row[36] && row[36].toString().trim() !== '';
                 
-                return (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) && tieneEntrega;
+                return (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) && despachoDefinido;
             });
 
             if (misNV.length > 0) {
-                mostrarListaNV(misNV, `✅ NV Completadas del vendedor ${VENDEDOR} (${misNV.length} encontradas)`);
+                mostrarListaNV(misNV, `✅ NV con Despacho Definido del vendedor ${VENDEDOR} (${misNV.length} encontradas)`);
             } else {
-                mostrarInfo(`No hay NV completadas para el vendedor ${VENDEDOR}.`);
+                mostrarInfo(`No hay NV con despacho definido para el vendedor ${VENDEDOR}.`);
             }
         }
 
@@ -688,20 +690,18 @@
             const data = resultado.data;
             const numeroNV = data[1] || 'Sin número';
             
-            // Evaluar fases
+            // ARREGLO: La lógica principal ahora se basa en si el despacho está definido.
             const tieneEjecutor = data[13] && data[13].toString().trim() !== '';
             const tieneArmado = data[34] && data[34].toString().trim() !== '';
-            const tieneEntrega = data[28] && data[28].toString().trim() !== '';
+            const despachoDefinido = data[36] && data[36].toString().trim() !== '';
+            const entregaConfirmada = data[28] && data[28].toString().trim() !== '';
+
 
             let html = `
                 <div class="result-container success">
                     <h3>✅ Nota de Venta ${numeroNV} Encontrada</h3>
                     
                     <div class="info-grid">
-                        <div class="info-item">
-                            <div class="info-label">📋 Número NV</div>
-                            <div class="info-value">${numeroNV}</div>
-                        </div>
                         <div class="info-item">
                             <div class="info-label">👤 Cliente</div>
                             <div class="info-value">${data[35] || 'Sin cliente'}</div>
@@ -731,7 +731,7 @@
                             1️⃣ FASE CREACIÓN
                             <span class="status-badge status-completed">✅ COMPLETADA</span>
                         </div>
-                        <div class="info-grid">
+                         <div class="info-grid">
                             <div class="info-item">
                                 <div class="info-label">📅 Fecha creación</div>
                                 <div class="info-value">${data[0] || 'No especificada'}</div>
@@ -739,10 +739,6 @@
                             <div class="info-item">
                                 <div class="info-label">👤 Vendedor</div>
                                 <div class="info-value">${data[3] || 'No especificado'}</div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-label">🕐 Turno</div>
-                                <div class="info-value">${data[2] || 'No especificado'}</div>
                             </div>
                         </div>
                     </div>
@@ -772,10 +768,6 @@
                                     <div class="info-label">📅 Fecha proceso</div>
                                     <div class="info-value">${data[14] || 'No especificada'}</div>
                                 </div>
-                                <div class="info-item">
-                                    <div class="info-label">📄 Documento</div>
-                                    <div class="info-value">${data[17] || 'No especificado'}</div>
-                                </div>
                             </div>
                         ` : `
                             <div style="color: #92400e; font-style: italic;">
@@ -784,29 +776,17 @@
                         `}
                     </div>
 
-                    <div class="phase ${tieneEntrega ? 'completed' : 'pending'}">
+                    <div class="phase ${despachoDefinido ? 'completed' : 'pending'}">
                         <div class="phase-header">
-                            3️⃣ FASE ENTREGA
-                            <span class="status-badge ${tieneEntrega ? 'status-completed' : 'status-pending'}">
-                                ${tieneEntrega ? '✅ COMPLETADA' : '⏳ PENDIENTE'}
+                            3️⃣ FASE DESPACHO Y ENTREGA
+                            <span class="status-badge ${despachoDefinido ? 'status-completed' : 'status-pending'}">
+                                ${despachoDefinido ? '✅ DEFINIDO' : '⏳ POR DEFINIR'}
                             </span>
                         </div>
-                        ${tieneEntrega ? `
+                        ${despachoDefinido ? `
                             <div class="info-grid">
                                 <div class="info-item">
-                                    <div class="info-label">👤 Entregado por</div>
-                                    <div class="info-value">${data[28]}</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-label">✍️ Recibido por</div>
-                                    <div class="info-value">${data[29] || 'No especificado'}</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-label">📅 Fecha entrega</div>
-                                    <div class="info-value">${data[33] || 'No especificada'}</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-label">🚚 Tipo envío</div>
+                                    <div class="info-label">🚚 Tipo de Despacho</div>
                                     <div class="info-value">${data[36] || 'No especificado'}</div>
                                 </div>
                                 <div class="info-item">
@@ -817,10 +797,35 @@
                                     <div class="info-label">📊 Bultos</div>
                                     <div class="info-value">${data[38] || 'No especificado'}</div>
                                 </div>
+                                <div class="info-item">
+                                    <div class="info-label">📅 Fecha Programada</div>
+                                    <div class="info-value">${data[39] || 'No especificada'}</div>
+                                </div>
                             </div>
+                            ${entregaConfirmada ? `
+                                <h5 style="margin-top: 20px; margin-bottom: 10px; border-top: 1px solid #eee; padding-top: 15px;">Confirmación de Entrega</h5>
+                                <div class="info-grid">
+                                    <div class="info-item">
+                                        <div class="info-label">👤 Entregado por</div>
+                                        <div class="info-value">${data[28]}</div>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label">✍️ Recibido por</div>
+                                        <div class="info-value">${data[29] || 'No especificado'}</div>
+                                    </div>
+                                    <div class="info-item">
+                                        <div class="info-label">📅 Fecha Entrega</div>
+                                        <div class="info-value">${data[33] || 'No especificada'}</div>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div style="color: #92400e; font-style: italic; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                                    ⏳ Entrega final pendiente.
+                                </div>
+                            `}
                         ` : `
                             <div style="color: #92400e; font-style: italic;">
-                                ⏳ Sin entregar al cliente
+                                ⏳ Despacho por definir.
                             </div>
                         `}
                     </div>
@@ -854,7 +859,8 @@
                 const cliente = nv[35] || 'Sin cliente';
                 const status = nv[4] || 'Sin status';
                 const fecha = nv[0] || 'Sin fecha';
-                const tieneEntrega = nv[28] && nv[28].toString().trim() !== '';
+                // ARREGLO: Chequear si el despacho está definido (columna 36).
+                const despachoDefinido = nv[36] && nv[36].toString().trim() !== '';
 
                 html += `
                     <div class="phase" style="margin-bottom: 10px; cursor: pointer;" onclick="verDetalleNV('${numeroNV}')">
@@ -864,8 +870,8 @@
                                 <small>👤 ${cliente} | 💰 ${status}</small>
                             </div>
                             <div style="text-align: right;">
-                                <div class="status-badge ${tieneEntrega ? 'status-completed' : 'status-pending'}">
-                                    ${tieneEntrega ? '✅ Completada' : '⏳ Pendiente'}
+                                <div class="status-badge ${despachoDefinido ? 'status-completed' : 'status-pending'}">
+                                    ${despachoDefinido ? '✅ Despacho Definido' : '⏳ Por Definir'}
                                 </div>
                                 <small style="display: block; margin-top: 5px;">📅 ${fecha}</small>
                             </div>
@@ -902,29 +908,31 @@
             informe += `👤 Cliente: ${data[35] || 'Sin cliente'}\n`;
             informe += `💰 Status: ${data[4] || 'Sin status'}\n`;
             informe += `🛍️ Vendedor: ${data[3] || 'Sin vendedor'}\n`;
-            informe += `📝 Descripción: ${data[15] || 'Sin descripción'}\n`;
-            informe += `🚚 Tipo Envío: ${data[36] || 'Sin definir'}\n\n`;
             
-            informe += `🔄 ESTADO DEL PROCESO:\n`;
+            informe += `\n🔄 ESTADO DEL PROCESO:\n`;
             informe += `${'─'.repeat(25)}\n`;
             
             const tieneArmado = data[34] && data[34].toString().trim() !== '';
             const tieneEjecutor = data[13] && data[13].toString().trim() !== '';
-            const tieneEntrega = data[28] && data[28].toString().trim() !== '';
+            const despachoDefinido = data[36] && data[36].toString().trim() !== '';
+            const entregaConfirmada = data[28] && data[28].toString().trim() !== '';
             
             informe += `1️⃣ CREACIÓN: ✅ COMPLETADA\n`;
-            if (tieneArmado) {
-                informe += `2️⃣ ARMADO: ✅ COMPLETADO por ${data[34]}\n`;
-            } else if (tieneEjecutor) {
-                informe += `2️⃣ PROCESAMIENTO: ✅ COMPLETADO por ${data[13]}\n`;
+            if (tieneArmado || tieneEjecutor) {
+                 informe += `2️⃣ ARMADO: ✅ COMPLETADO\n`;
             } else {
-                informe += `2️⃣ ARMADO: ❌ PENDIENTE\n`;
+                informe += `2️⃣ ARMADO: ⏳ PENDIENTE\n`;
             }
             
-            if (tieneEntrega) {
-                informe += `3️⃣ ENTREGA: ✅ COMPLETADA por ${data[28]}\n`;
+            if (despachoDefinido) {
+                informe += `3️⃣ DESPACHO: ✅ DEFINIDO (${data[36]})\n`;
+                 if (entregaConfirmada) {
+                    informe += `4️⃣ ENTREGA: ✅ COMPLETADA\n`;
+                 } else {
+                    informe += `4️⃣ ENTREGA: ⏳ PENDIENTE\n`;
+                 }
             } else {
-                informe += `3️⃣ ENTREGA: ❌ PENDIENTE\n`;
+                informe += `3️⃣ DESPACHO: ⏳ POR DEFINIR\n`;
             }
 
             copiarAlPortapapeles(informe);
@@ -942,29 +950,26 @@
             
             informe += `📋 INFORMACIÓN BÁSICA\n`;
             informe += `${'─'.repeat(20)}\n`;
-            informe += `• NV: ${data[1] || 'Sin número'}\n`;
-            informe += `• Cliente: ${data[35] || 'Sin cliente'}\n`;
-            informe += `• Vendedor: ${data[3] || 'Sin vendedor'}\n`;
-            informe += `• Status: ${data[4] || 'Sin status'}\n`;
-            informe += `• Descripción: ${data[15] || 'Sin descripción'}\n`;
-            informe += `• Tipo Envío: ${data[36] || 'Sin definir'}\n`;
-            informe += `• Observaciones: ${data[5] || 'Sin observaciones'}\n\n`;
+            informe += `• NV: ${data[1] || 'N/A'}\n`;
+            informe += `• Cliente: ${data[35] || 'N/A'}\n`;
+            informe += `• Vendedor: ${data[3] || 'N/A'}\n`;
+            informe += `• Status: ${data[4] || 'N/A'}\n`;
+            informe += `• Descripción: ${data[15] || 'N/A'}\n\n`;
             
             informe += `🔄 DETALLE DEL PROCESO\n`;
             informe += `${'═'.repeat(25)}\n\n`;
+
+            const tieneArmado = data[34] && data[34].toString().trim() !== '';
+            const tieneEjecutor = data[13] && data[13].toString().trim() !== '';
+            const despachoDefinido = data[36] && data[36].toString().trim() !== '';
+            const entregaConfirmada = data[28] && data[28].toString().trim() !== '';
             
             informe += `1️⃣ FASE CREACIÓN\n`;
             informe += `${'─'.repeat(15)}\n`;
             informe += `Estado: ✅ COMPLETADA\n`;
             if (data[0]) informe += `Fecha: ${data[0]}\n`;
-            if (data[3]) informe += `Vendedor: ${data[3]}\n`;
-            if (data[2]) informe += `Turno: ${data[2]}\n`;
-            informe += `\n`;
-            
-            const tieneArmado = data[34] && data[34].toString().trim() !== '';
-            const tieneEjecutor = data[13] && data[13].toString().trim() !== '';
-            const tieneEntrega = data[28] && data[28].toString().trim() !== '';
-            
+            if (data[3]) informe += `Vendedor: ${data[3]}\n\n`;
+
             informe += `2️⃣ FASE ARMADO/PROCESAMIENTO\n`;
             informe += `${'─'.repeat(25)}\n`;
             if (tieneArmado || tieneEjecutor) {
@@ -972,80 +977,58 @@
                 if (tieneArmado) informe += `Armado por: ${data[34]}\n`;
                 if (tieneEjecutor) informe += `Ejecutor: ${data[13]}\n`;
                 if (data[14]) informe += `Fecha proceso: ${data[14]}\n`;
-                if (data[17]) informe += `Documento: ${data[17]}\n`;
             } else {
-                informe += `Estado: ❌ PENDIENTE\n`;
-                informe += `Sin asignar para armado/procesamiento\n`;
+                informe += `Estado: ⏳ PENDIENTE\n`;
             }
             informe += `\n`;
             
-            informe += `3️⃣ FASE ENTREGA\n`;
-            informe += `${'─'.repeat(15)}\n`;
-            if (tieneEntrega) {
-                informe += `Estado: ✅ COMPLETADA\n`;
-                informe += `Entregado por: ${data[28]}\n`;
-                if (data[29]) informe += `Recibido por: ${data[29]}\n`;
-                if (data[33]) informe += `Fecha entrega: ${data[33]}\n`;
+            informe += `3️⃣ FASE DESPACHO Y ENTREGA\n`;
+            informe += `${'─'.repeat(25)}\n`;
+            if (despachoDefinido) {
+                informe += `Estado Despacho: ✅ DEFINIDO\n`;
+                informe += `Tipo: ${data[36]}\n`;
                 if (data[37]) informe += `Courier: ${data[37]}\n`;
                 if (data[38]) informe += `Bultos: ${data[38]}\n`;
-            } else {
-                informe += `Estado: ❌ PENDIENTE\n`;
-                informe += `Sin entregar al cliente\n`;
-            }
-            informe += `\n`;
-            
-            let progreso = 1;
-            if (tieneArmado || tieneEjecutor) progreso++;
-            if (tieneEntrega) progreso++;
-            
-            informe += `📊 RESUMEN GENERAL\n`;
-            informe += `${'─'.repeat(18)}\n`;
-            informe += `Progreso: ${progreso}/3 fases completadas\n`;
-            
-            if (progreso === 3) {
-                informe += `✅ PROCESO COMPLETADO\n`;
-            } else {
-                informe += `⏳ EN PROCESO\n`;
-                if (progreso === 1) {
-                    informe += `Siguiente: Asignar para armado\n`;
-                } else if (progreso === 2) {
-                    informe += `Siguiente: Coordinar entrega\n`;
+                if (data[39]) informe += `Fecha programada: ${data[39]}\n\n`;
+
+                if (entregaConfirmada) {
+                    informe += `Estado Entrega: ✅ COMPLETADA\n`;
+                    informe += `Entregado por: ${data[28]}\n`;
+                    if (data[29]) informe += `Recibido por: ${data[29]}\n`;
+                    if (data[33]) informe += `Fecha entrega: ${data[33]}\n`;
+                } else {
+                    informe += `Estado Entrega: ⏳ PENDIENTE\n`;
                 }
+            } else {
+                informe += `Estado Despacho: ⏳ POR DEFINIR\n`;
             }
 
             copiarAlPortapapeles(informe);
         }
 
-        // Función para refrescar datos manualmente
+        // --- FUNCIONES AUXILIARES (sin cambios) ---
+
         async function refrescarDatos() {
             const btn = document.getElementById('btnRefrescar');
             const originalText = btn.innerHTML;
-            
             btn.innerHTML = '<span>⏳</span> Refrescando...';
             btn.disabled = true;
-            
             await cargarDatos(true);
-            
             btn.innerHTML = originalText;
             btn.disabled = false;
         }
 
-        // Función para toggle auto-refresh
         function toggleAutoRefresh() {
             const checkbox = document.getElementById('autoRefresh');
-            
             if (intervalRefresh) {
                 clearInterval(intervalRefresh);
                 intervalRefresh = null;
             }
-            
             if (checkbox.checked) {
-                // Activar auto-refresh cada 2 minutos
                 intervalRefresh = setInterval(async () => {
                     console.log('🔄 Auto-refresh activado');
-                    await cargarDatos(false); // Sin mostrar notificaciones ruidosas
-                }, 120000); // 2 minutos
-                
+                    await cargarDatos(false);
+                }, 120000);
                 iniciarContadorProximaActualizacion();
                 console.log('✅ Auto-refresh activado (cada 2 minutos)');
             } else {
@@ -1054,17 +1037,14 @@
             }
         }
 
-        // Función para actualizar el estado de conexión
         function actualizarEstadoConexion(texto, tipo = 'info') {
             const elemento = document.getElementById('estadoConexion');
             if (elemento) {
                 elemento.textContent = texto;
-                elemento.style.color = tipo === 'success' ? '#059669' : 
-                                     tipo === 'error' ? '#dc2626' : '#6b7280';
+                elemento.style.color = tipo === 'success' ? '#059669' : tipo === 'error' ? '#dc2626' : '#6b7280';
             }
         }
 
-        // Función para actualizar última actualización
         function actualizarUltimaActualizacion() {
             if (ultimaActualizacion) {
                 const elemento = document.getElementById('ultimaActualizacion');
@@ -1074,10 +1054,8 @@
             }
         }
 
-        // Contador para próxima actualización
         function iniciarContadorProximaActualizacion() {
-            let segundosRestantes = 120; // 2 minutos
-            
+            let segundosRestantes = 120;
             const actualizarContador = () => {
                 if (segundosRestantes > 0) {
                     const minutos = Math.floor(segundosRestantes / 60);
@@ -1085,11 +1063,9 @@
                     actualizarProximaActualizacion(`Próxima actualización en: ${minutos}:${segundos.toString().padStart(2, '0')}`);
                     segundosRestantes--;
                 } else {
-                    segundosRestantes = 120; // Reiniciar contador
+                    segundosRestantes = 120;
                 }
             };
-            
-            // Actualizar inmediatamente y luego cada segundo
             actualizarContador();
             const contadorInterval = setInterval(() => {
                 if (!document.getElementById('autoRefresh').checked) {
@@ -1100,7 +1076,6 @@
             }, 1000);
         }
 
-        // Función para actualizar próxima actualización
         function actualizarProximaActualizacion(texto) {
             const elemento = document.getElementById('proximaActualizacion');
             if (elemento) {
@@ -1108,15 +1083,11 @@
             }
         }
 
-        // Notificación silenciosa (menos intrusiva)
         function mostrarNotificacionSilenciosa(mensaje) {
             console.log(`🔔 ${mensaje}`);
-            
-            // Actualizar el estado brevemente
             const estadoOriginal = document.getElementById('estadoConexion').textContent;
             document.getElementById('estadoConexion').textContent = mensaje;
             document.getElementById('estadoConexion').style.color = '#0891b2';
-            
             setTimeout(() => {
                 document.getElementById('estadoConexion').textContent = estadoOriginal;
                 document.getElementById('estadoConexion').style.color = '#059669';
@@ -1137,43 +1108,12 @@
 
         function mostrarTextoParaCopiar(texto) {
             const modal = document.createElement('div');
-            modal.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.8);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 1000;
-            `;
-
+            modal.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1000;`;
             const contenido = document.createElement('div');
-            contenido.style.cssText = `
-                background: white;
-                padding: 30px;
-                border-radius: 15px;
-                max-width: 90%;
-                max-height: 90%;
-                overflow: auto;
-            `;
-
-            contenido.innerHTML = `
-                <h3>📋 Copia este texto</h3>
-                <textarea style="width: 100%; height: 300px; margin: 15px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace;" readonly>${texto}</textarea>
-                <div style="text-align: center;">
-                    <button class="btn btn-primary" onclick="this.parentElement.parentElement.parentElement.remove()">
-                        ✅ Cerrar
-                    </button>
-                </div>
-            `;
-
+            contenido.style.cssText = `background: white; padding: 30px; border-radius: 15px; max-width: 90%; max-height: 90%; overflow: auto;`;
+            contenido.innerHTML = `<h3>📋 Copia este texto</h3><textarea style="width: 100%; height: 300px; margin: 15px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: monospace;" readonly>${texto}</textarea><div style="text-align: center;"><button class="btn btn-primary" onclick="this.parentElement.parentElement.parentElement.remove()">✅ Cerrar</button></div>`;
             modal.appendChild(contenido);
             document.body.appendChild(modal);
-
-            // Seleccionar el texto del textarea
             const textarea = contenido.querySelector('textarea');
             textarea.select();
             textarea.setSelectionRange(0, 99999);
@@ -1181,23 +1121,9 @@
 
         function mostrarNotificacion(mensaje) {
             const notificacion = document.createElement('div');
-            notificacion.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #2dd4bf;
-                color: white;
-                padding: 15px 25px;
-                border-radius: 10px;
-                box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-                z-index: 1001;
-                font-weight: bold;
-                animation: slideIn 0.3s ease;
-            `;
-
+            notificacion.style.cssText = `position: fixed; top: 20px; right: 20px; background: #2dd4bf; color: white; padding: 15px 25px; border-radius: 10px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); z-index: 1001; font-weight: bold; animation: slideIn 0.3s ease;`;
             notificacion.textContent = mensaje;
             document.body.appendChild(notificacion);
-
             setTimeout(() => {
                 notificacion.style.animation = 'slideOut 0.3s ease';
                 setTimeout(() => {
@@ -1209,12 +1135,7 @@
         }
 
         function mostrarCargando() {
-            document.getElementById('resultados').innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p style="margin-top: 15px;">Cargando datos...</p>
-                </div>
-            `;
+            document.getElementById('resultados').innerHTML = `<div class="loading"><div class="spinner"></div><p style="margin-top: 15px;">Cargando datos...</p></div>`;
         }
 
         function ocultarCargando() {
@@ -1225,48 +1146,15 @@
         }
 
         function mostrarError(mensaje) {
-            document.getElementById('resultados').innerHTML = `
-                <div class="result-container error">
-                    <h3>❌ Error</h3>
-                    <p>${mensaje}</p>
-                </div>
-            `;
+            document.getElementById('resultados').innerHTML = `<div class="result-container error"><h3>❌ Error</h3><p>${mensaje}</p></div>`;
         }
 
         function mostrarInfo(mensaje) {
-            document.getElementById('resultados').innerHTML = `
-                <div class="result-container">
-                    <h3>ℹ️ Información</h3>
-                    <p>${mensaje}</p>
-                </div>
-            `;
+            document.getElementById('resultados').innerHTML = `<div class="result-container"><h3>ℹ️ Información</h3><p>${mensaje}</p></div>`;
         }
 
-        // Añadir estilos para las animaciones
         const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideIn {
-                from {
-                    transform: translateX(100%);
-                    opacity: 0;
-                }
-                to {
-                    transform: translateX(0);
-                    opacity: 1;
-                }
-            }
-
-            @keyframes slideOut {
-                from {
-                    transform: translateX(0);
-                    opacity: 1;
-                }
-                to {
-                    transform: translateX(100%);
-                    opacity: 0;
-                }
-            }
-        `;
+        style.textContent = `@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } } @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }`;
         document.head.appendChild(style);
     </script>
 </body>
