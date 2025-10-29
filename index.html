@@ -249,6 +249,39 @@
             background: #bae6fd;
         }
 
+        .btn-foto {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+            color: white;
+        }
+
+        .btn-foto:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .btn-foto:active {
+            transform: translateY(0);
+        }
+
+        .foto-preview {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .foto-preview:hover {
+            border-color: #0891b2;
+            box-shadow: 0 4px 12px rgba(8, 145, 178, 0.2);
+        }
+
         .status-connection {
             padding: 10px 15px;
             border-radius: 8px;
@@ -615,7 +648,7 @@
             return resultado;
         }
 
-        // DETECTAR FOTOS SIMPLIFICADO - SEGÚN GOOGLE SHEETS REAL
+        // DETECTAR FOTOS CON EXTRACCIÓN DE URLs REALES DE GOOGLE DRIVE
         function detectarFotos(data) {
             const fotos = [];
             
@@ -653,12 +686,27 @@
                     
                     const valorLimpio = valor.toString().trim();
                     
-                    // Si tiene contenido, lo agregamos
-                    if (valorLimpio.length > 0) {
+                    // EXTRAER URL DE GOOGLE DRIVE si es un hipervínculo
+                    const urlExtraida = extraerURLGoogleDrive(valorLimpio);
+                    
+                    if (urlExtraida) {
+                        // Es un hipervínculo con URL de Google Drive
                         fotos.push({
                             nombre: col.nombre,
                             texto: valorLimpio,
-                            fase: col.fase
+                            url: urlExtraida,
+                            urlVisualizacion: convertirURLVisualizacion(urlExtraida),
+                            urlThumbnail: convertirURLThumbnail(urlExtraida),
+                            fase: col.fase,
+                            tipo: 'drive'
+                        });
+                    } else if (valorLimpio.length > 0) {
+                        // Es solo texto, mostrar como antes
+                        fotos.push({
+                            nombre: col.nombre,
+                            texto: valorLimpio,
+                            fase: col.fase,
+                            tipo: 'texto'
                         });
                     }
                 }
@@ -667,35 +715,133 @@
             return fotos;
         }
 
-        // GENERAR GALERÍA DE FOTOS SIMPLIFICADA
+        // FUNCIÓN PARA EXTRAER URL DE GOOGLE DRIVE DE HIPERVÍNCULOS
+        function extraerURLGoogleDrive(texto) {
+            // Buscar patrones de hipervínculos de Google Drive
+            const patrones = [
+                /https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/g,
+                /https:\/\/docs\.google\.com\/[^\/]+\/d\/([a-zA-Z0-9_-]+)/g
+            ];
+            
+            for (const patron of patrones) {
+                const match = patron.exec(texto);
+                if (match) {
+                    return match[0]; // Devolver la URL completa encontrada
+                }
+            }
+            
+            return null;
+        }
+
+        // CONVERTIR URL DE GOOGLE DRIVE PARA VISUALIZACIÓN DIRECTA
+        function convertirURLVisualizacion(url) {
+            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (match) {
+                const fileId = match[1];
+                return `https://drive.google.com/uc?id=${fileId}&export=view`;
+            }
+            return url;
+        }
+
+        // CONVERTIR URL DE GOOGLE DRIVE PARA THUMBNAIL
+        function convertirURLThumbnail(url) {
+            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (match) {
+                const fileId = match[1];
+                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w300`;
+            }
+            return url;
+        }
+
+        // GENERAR GALERÍA DE FOTOS CON VISUALIZACIÓN REAL
         function generarGaleriaFotos(fotos) {
             if (fotos.length === 0) return '';
+            
+            const fotosDrive = fotos.filter(f => f.tipo === 'drive');
+            const fotosTexto = fotos.filter(f => f.tipo === 'texto');
             
             let html = `
                 <div class="foto-gallery">
                     <h4>📸 Fotos y Documentos (${fotos.length} disponibles)</h4>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
             `;
             
-            fotos.forEach((foto, index) => {
-                const icono = foto.fase === 'creacion' ? '📋' : 
-                           foto.fase === 'proceso' ? '🔧' : '📦';
-                
+            if (fotosDrive.length > 0) {
                 html += `
-                    <div class="foto-item" onclick="mostrarInfoFoto('${foto.texto}', '${foto.nombre}')">
-                        <span>${icono}</span>
-                        <span style="color: #0891b2; font-weight: bold;">
-                            ${foto.texto}
-                        </span>
-                    </div>
+                    <h5 style="margin-top: 15px; margin-bottom: 10px; color: #059669;">🔗 Fotos con Enlaces Directos (${fotosDrive.length})</h5>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
                 `;
-            });
+                
+                fotosDrive.forEach((foto, index) => {
+                    const icono = foto.fase === 'creacion' ? '📋' : 
+                               foto.fase === 'proceso' ? '🔧' : '📦';
+                    
+                    html += `
+                        <div style="border: 2px solid #e1e1e1; border-radius: 10px; padding: 15px; background: white; text-align: center;">
+                            <div style="font-weight: bold; margin-bottom: 10px; color: #374151;">
+                                ${icono} ${foto.nombre}
+                            </div>
+                            
+                            <!-- Preview de la imagen -->
+                            <div style="margin-bottom: 10px; min-height: 120px; display: flex; align-items: center; justify-content: center; background: #f9fafb; border-radius: 6px;">
+                                <img src="${foto.urlThumbnail}" 
+                                     alt="${foto.nombre}"
+                                     style="max-width: 100%; max-height: 120px; border-radius: 4px; cursor: pointer;"
+                                     onclick="abrirFotoCompleta('${foto.urlVisualizacion}', '${foto.nombre}')"
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                                />
+                                <div style="display: none; color: #6b7280; font-size: 0.9em;">
+                                    📷 Vista previa no disponible<br>
+                                    <small>Haz clic en "Ver" para abrir</small>
+                                </div>
+                            </div>
+                            
+                            <!-- Botones de acción -->
+                            <div style="display: flex; gap: 8px; justify-content: center;">
+                                <button onclick="abrirFotoCompleta('${foto.urlVisualizacion}', '${foto.nombre}')" 
+                                        class="btn-foto" title="Ver imagen completa">
+                                    👁️ Ver
+                                </button>
+                                <button onclick="descargarFoto('${foto.url}', '${foto.nombre}')" 
+                                        class="btn-foto" title="Descargar imagen">
+                                    ⬇️ Bajar
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            }
+            
+            if (fotosTexto.length > 0) {
+                html += `
+                    <h5 style="margin-top: 15px; margin-bottom: 10px; color: #d97706;">📝 Solo Texto (${fotosTexto.length})</h5>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                `;
+                
+                fotosTexto.forEach((foto, index) => {
+                    const icono = foto.fase === 'creacion' ? '📋' : 
+                               foto.fase === 'proceso' ? '🔧' : '📦';
+                    
+                    html += `
+                        <div class="foto-item" onclick="mostrarInfoFoto('${foto.texto}', '${foto.nombre}')">
+                            <span>${icono}</span>
+                            <span style="color: #0891b2; font-weight: bold;">
+                                ${foto.texto}
+                            </span>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            }
             
             html += `
-                    </div>
-                    <div style="margin-top: 10px; padding: 10px; background: #f0f9ff; border-radius: 6px; font-size: 0.9em; color: #0369a1;">
-                        💡 <strong>Nota:</strong> Los enlaces de fotos funcionan desde Google Sheets. 
-                        Aquí se muestra el texto del campo.
+                    <div style="margin-top: 15px; padding: 12px; background: #f0f9ff; border-radius: 8px; font-size: 0.9em; color: #0369a1;">
+                        💡 <strong>Cómo usar:</strong><br>
+                        • <strong>👁️ Ver:</strong> Abre la imagen en tamaño completo<br>
+                        • <strong>⬇️ Bajar:</strong> Descarga la imagen a tu dispositivo<br>
+                        • <strong>🖱️ Click en preview:</strong> También abre la imagen completa
                     </div>
                 </div>
             `;
@@ -703,8 +849,83 @@
             return html;
         }
 
+        // FUNCIÓN PARA ABRIR FOTO COMPLETA
+        function abrirFotoCompleta(url, nombre) {
+            // Crear modal para mostrar la imagen completa
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; 
+                top: 0; 
+                left: 0; 
+                width: 100%; 
+                height: 100%; 
+                background: rgba(0,0,0,0.9); 
+                display: flex; 
+                justify-content: center; 
+                align-items: center; 
+                z-index: 2000;
+                cursor: pointer;
+            `;
+            
+            const contenido = document.createElement('div');
+            contenido.style.cssText = `
+                max-width: 95%;
+                max-height: 95%;
+                text-align: center;
+            `;
+            
+            contenido.innerHTML = `
+                <img src="${url}" 
+                     alt="${nombre}"
+                     style="max-width: 100%; max-height: 85vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                />
+                <div style="display: none; color: white; padding: 20px; font-size: 1.2em;">
+                    ❌ No se pudo cargar la imagen<br>
+                    <small style="color: #ccc;">Verifica los permisos de Google Drive</small>
+                </div>
+                <div style="color: white; margin-top: 15px; font-size: 1.1em; font-weight: bold;">
+                    📷 ${nombre}
+                </div>
+                <div style="color: #ccc; margin-top: 8px; font-size: 0.9em;">
+                    Haz clic en cualquier lugar para cerrar
+                </div>
+            `;
+            
+            modal.appendChild(contenido);
+            
+            // Cerrar al hacer clic
+            modal.onclick = () => {
+                document.body.removeChild(modal);
+            };
+            
+            document.body.appendChild(modal);
+        }
+
+        // FUNCIÓN PARA DESCARGAR FOTO
+        function descargarFoto(url, nombre) {
+            try {
+                // Abrir en nueva pestaña para descarga
+                const link = document.createElement('a');
+                link.href = url;
+                link.target = '_blank';
+                link.download = nombre || 'foto';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                mostrarNotificacion(`📷 Abriendo ${nombre} para descarga`);
+            } catch (error) {
+                console.error('Error al descargar foto:', error);
+                // Fallback: abrir en nueva pestaña
+                window.open(url, '_blank');
+                mostrarNotificacion(`📷 Abriendo ${nombre} en nueva pestaña`);
+            }
+        }
+
+        // FUNCIÓN PARA MOSTRAR INFO DE FOTOS SIN URL
         function mostrarInfoFoto(texto, nombre) {
-            alert(`📷 ${nombre}\n\nTexto: ${texto}\n\n💡 Para ver la foto, accede desde Google Sheets directamente.`);
+            alert(`📷 ${nombre}\n\nTexto: ${texto}\n\n💡 Esta entrada no contiene un enlace directo a una imagen.`);
         }
 
         // FINALIZAR CARGA OPTIMIZADA
