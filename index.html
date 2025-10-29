@@ -772,110 +772,53 @@
             return url;
         }
 
-        // GENERAR GALERÍA DE FOTOS CON HIPERVÍNCULOS COPIABLES
+        // GENERAR LISTA SIMPLE DE HIPERVÍNCULOS TAL COMO ESTÁN EN SHEETS
         function generarGaleriaFotos(fotos) {
             if (fotos.length === 0) return '';
-            
-            const fotosDrive = fotos.filter(f => f.tipo === 'drive');
-            const fotosTexto = fotos.filter(f => f.tipo === 'texto');
             
             let html = `
                 <div class="foto-gallery">
                     <h4>📸 Fotos y Documentos (${fotos.length} disponibles)</h4>
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px;">
             `;
             
-            if (fotosDrive.length > 0) {
-                html += `
-                    <h5 style="margin-top: 15px; margin-bottom: 10px; color: #059669;">🔗 Fotos con Enlaces Directos (${fotosDrive.length})</h5>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                `;
+            fotos.forEach((foto, index) => {
+                const icono = foto.fase === 'creacion' ? '📋' : 
+                           foto.fase === 'proceso' ? '🔧' : '📦';
                 
-                fotosDrive.forEach((foto, index) => {
-                    const icono = foto.fase === 'creacion' ? '📋' : 
-                               foto.fase === 'proceso' ? '🔧' : '📦';
+                if (foto.tipo === 'drive' && foto.url) {
+                    // Mostrar hipervínculo completo tal como está en Sheets
+                    const hipervinculoCompleto = `=HIPERVINCULO("${foto.url}"; "${foto.texto}")`;
                     
                     html += `
-                        <div style="border: 2px solid #e1e1e1; border-radius: 10px; padding: 15px; background: white;">
-                            <div style="font-weight: bold; margin-bottom: 10px; color: #374151;">
-                                ${icono} ${foto.texto}
-                            </div>
-                            
-                            <!-- Preview de la imagen -->
-                            <div style="margin-bottom: 10px; min-height: 120px; display: flex; align-items: center; justify-content: center; background: #f9fafb; border-radius: 6px;">
-                                <img src="${foto.urlThumbnail}" 
-                                     alt="${foto.nombre}"
-                                     style="max-width: 100%; max-height: 120px; border-radius: 4px; cursor: pointer;"
-                                     onclick="abrirFotoCompleta('${foto.urlVisualizacion}', '${foto.nombre}')"
-                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
-                                />
-                                <div style="display: none; color: #6b7280; font-size: 0.9em; text-align: center;">
-                                    📷 Vista previa no disponible<br>
-                                    <small>Haz clic en "Ver" para abrir</small>
-                                </div>
-                            </div>
-                            
-                            <!-- Hipervínculo completo copiable -->
-                            <div style="background: #f8f9fa; padding: 8px; border-radius: 4px; margin-bottom: 10px; font-size: 0.8em; word-break: break-all;">
-                                <div style="font-weight: bold; color: #374151; margin-bottom: 4px;">🔗 Hipervínculo:</div>
-                                <input type="text" value="${foto.url}" readonly 
-                                       style="width: 100%; padding: 4px; border: 1px solid #d1d5db; border-radius: 3px; font-size: 0.75em; background: white;"
-                                       onclick="this.select(); navigator.clipboard.writeText(this.value).then(() => mostrarNotificacion('✅ URL copiada')).catch(() => this.select());"
-                                />
-                                <small style="color: #6b7280;">👆 Click para copiar URL</small>
-                            </div>
-                            
-                            <!-- Botones de acción -->
-                            <div style="display: flex; gap: 8px; justify-content: center;">
-                                <button onclick="abrirFotoCompleta('${foto.urlVisualizacion}', '${foto.nombre}')" 
-                                        class="btn-foto" title="Ver imagen completa">
-                                    👁️ Ver
-                                </button>
-                                <button onclick="descargarFoto('${foto.url}', '${foto.nombre}')" 
-                                        class="btn-foto" title="Descargar imagen">
-                                    ⬇️ Bajar
-                                </button>
-                                <button onclick="copiarHipervinculo('${foto.url}', '${foto.texto}')" 
-                                        class="btn-foto" title="Copiar hipervínculo completo">
-                                    📋 Copiar
-                                </button>
+                        <div style="margin-bottom: 10px; padding: 10px; background: white; border-radius: 6px; border-left: 4px solid #0891b2;">
+                            <div style="font-family: monospace; font-size: 0.9em; word-break: break-all;">
+                                <strong>${icono} ${foto.texto}</strong> 
+                                <span style="color: #0891b2; cursor: pointer; text-decoration: underline;" 
+                                      onclick="abrirFotoDirecta('${foto.urlVisualizacion}', '${foto.texto}')"
+                                      title="Click para abrir foto">
+                                    ${hipervinculoCompleto}
+                                </span>
                             </div>
                         </div>
                     `;
-                });
-                
-                html += '</div>';
-            }
-            
-            if (fotosTexto.length > 0) {
-                html += `
-                    <h5 style="margin-top: 15px; margin-bottom: 10px; color: #d97706;">📝 Solo Texto (${fotosTexto.length})</h5>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                `;
-                
-                fotosTexto.forEach((foto, index) => {
-                    const icono = foto.fase === 'creacion' ? '📋' : 
-                               foto.fase === 'proceso' ? '🔧' : '📦';
-                    
+                } else {
+                    // Solo texto sin hipervínculo
                     html += `
-                        <div class="foto-item" onclick="mostrarInfoFoto('${foto.texto}', '${foto.nombre}')">
-                            <span>${icono}</span>
-                            <span style="color: #0891b2; font-weight: bold;">
-                                ${foto.texto}
-                            </span>
+                        <div style="margin-bottom: 10px; padding: 10px; background: white; border-radius: 6px; border-left: 4px solid #d97706;">
+                            <div style="color: #666;">
+                                <strong>${icono} ${foto.texto}</strong> 
+                                <span style="font-style: italic;">(solo texto, sin enlace)</span>
+                            </div>
                         </div>
                     `;
-                });
-                
-                html += '</div>';
-            }
+                }
+            });
             
             html += `
-                    <div style="margin-top: 15px; padding: 12px; background: #f0f9ff; border-radius: 8px; font-size: 0.9em; color: #0369a1;">
-                        💡 <strong>Cómo usar:</strong><br>
-                        • <strong>👁️ Ver:</strong> Abre la imagen en tamaño completo<br>
-                        • <strong>⬇️ Bajar:</strong> Descarga la imagen a tu dispositivo<br>
-                        • <strong>📋 Copiar:</strong> Copia el hipervínculo completo<br>
-                        • <strong>🖱️ Click en URL:</strong> Selecciona y copia la URL directamente
+                    </div>
+                    <div style="margin-top: 12px; padding: 10px; background: #f0f9ff; border-radius: 6px; font-size: 0.9em; color: #0369a1;">
+                        💡 <strong>Instrucciones:</strong> Haz clic en cualquier hipervínculo azul para abrir la foto directamente.
                     </div>
                 </div>
             `;
@@ -883,19 +826,11 @@
             return html;
         }
 
-        // FUNCIÓN PARA COPIAR HIPERVÍNCULO COMPLETO
-        function copiarHipervinculo(url, texto) {
-            const hipervinculo = `=HIPERVINCULO("${url}";"${texto}")`;
-            
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(hipervinculo).then(() => {
-                    mostrarNotificacion(`✅ Hipervínculo copiado: ${texto}`);
-                }).catch(() => {
-                    mostrarTextoParaCopiar(hipervinculo);
-                });
-            } else {
-                mostrarTextoParaCopiar(hipervinculo);
-            }
+        // FUNCIÓN SIMPLE PARA ABRIR FOTO DIRECTA
+        function abrirFotoDirecta(url, nombre) {
+            // Abrir directamente en nueva pestaña
+            window.open(url, '_blank');
+            mostrarNotificacion(`📷 Abriendo: ${nombre}`);
         }
 
         // FUNCIÓN PARA ABRIR FOTO COMPLETA
