@@ -648,7 +648,7 @@
             return resultado;
         }
 
-        // DETECTAR FOTOS CON EXTRACCIÓN DE URLs REALES DE GOOGLE DRIVE
+        // DETECTAR FOTOS CON EXTRACCIÓN MEJORADA DE HIPERVÍNCULOS
         function detectarFotos(data) {
             const fotos = [];
             
@@ -686,27 +686,31 @@
                     
                     const valorLimpio = valor.toString().trim();
                     
-                    // EXTRAER URL DE GOOGLE DRIVE si es un hipervínculo
-                    const urlExtraida = extraerURLGoogleDrive(valorLimpio);
+                    // BUSCAR HIPERVÍNCULO COMPLETO (formato: =HIPERVINCULO("URL";"TEXTO"))
+                    const urlExtraida = extraerURLCompleta(valorLimpio);
                     
                     if (urlExtraida) {
-                        // Es un hipervínculo con URL de Google Drive
+                        // Encontró un hipervínculo con URL
+                        const textoVisible = extraerTextoHipervinculo(valorLimpio) || col.nombre;
+                        
                         fotos.push({
                             nombre: col.nombre,
-                            texto: valorLimpio,
+                            texto: textoVisible,
                             url: urlExtraida,
                             urlVisualizacion: convertirURLVisualizacion(urlExtraida),
                             urlThumbnail: convertirURLThumbnail(urlExtraida),
                             fase: col.fase,
-                            tipo: 'drive'
+                            tipo: 'drive',
+                            mostrarURL: true
                         });
                     } else if (valorLimpio.length > 0) {
-                        // Es solo texto, mostrar como antes
+                        // Solo texto, mostrar como antes
                         fotos.push({
                             nombre: col.nombre,
                             texto: valorLimpio,
                             fase: col.fase,
-                            tipo: 'texto'
+                            tipo: 'texto',
+                            mostrarURL: false
                         });
                     }
                 }
@@ -715,19 +719,34 @@
             return fotos;
         }
 
-        // FUNCIÓN PARA EXTRAER URL DE GOOGLE DRIVE DE HIPERVÍNCULOS
-        function extraerURLGoogleDrive(texto) {
-            // Buscar patrones de hipervínculos de Google Drive
-            const patrones = [
-                /https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/g,
-                /https:\/\/docs\.google\.com\/[^\/]+\/d\/([a-zA-Z0-9_-]+)/g
-            ];
+        // FUNCIÓN MEJORADA PARA EXTRAER URL COMPLETA
+        function extraerURLCompleta(texto) {
+            // Buscar hipervínculo en formato =HIPERVINCULO("URL";"TEXTO")
+            const patronHipervinculo = /=HIPERVINCULO\s*\(\s*"([^"]+)"\s*;\s*"[^"]*"\s*\)/i;
+            const match = patronHipervinculo.exec(texto);
             
-            for (const patron of patrones) {
-                const match = patron.exec(texto);
-                if (match) {
-                    return match[0]; // Devolver la URL completa encontrada
-                }
+            if (match) {
+                return match[1]; // Devolver la URL extraída
+            }
+            
+            // Si no es hipervínculo, buscar URL directa
+            const patronURL = /https:\/\/drive\.google\.com\/file\/d\/[a-zA-Z0-9_-]+/;
+            const matchURL = patronURL.exec(texto);
+            
+            if (matchURL) {
+                return matchURL[0];
+            }
+            
+            return null;
+        }
+
+        // FUNCIÓN PARA EXTRAER TEXTO DEL HIPERVÍNCULO
+        function extraerTextoHipervinculo(texto) {
+            const patronTexto = /=HIPERVINCULO\s*\(\s*"[^"]+"\s*;\s*"([^"]*)"\s*\)/i;
+            const match = patronTexto.exec(texto);
+            
+            if (match) {
+                return match[1]; // Devolver el texto visible
             }
             
             return null;
@@ -753,7 +772,7 @@
             return url;
         }
 
-        // GENERAR GALERÍA DE FOTOS CON VISUALIZACIÓN REAL
+        // GENERAR GALERÍA DE FOTOS CON HIPERVÍNCULOS COPIABLES
         function generarGaleriaFotos(fotos) {
             if (fotos.length === 0) return '';
             
@@ -768,7 +787,7 @@
             if (fotosDrive.length > 0) {
                 html += `
                     <h5 style="margin-top: 15px; margin-bottom: 10px; color: #059669;">🔗 Fotos con Enlaces Directos (${fotosDrive.length})</h5>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-bottom: 20px;">
                 `;
                 
                 fotosDrive.forEach((foto, index) => {
@@ -776,9 +795,9 @@
                                foto.fase === 'proceso' ? '🔧' : '📦';
                     
                     html += `
-                        <div style="border: 2px solid #e1e1e1; border-radius: 10px; padding: 15px; background: white; text-align: center;">
+                        <div style="border: 2px solid #e1e1e1; border-radius: 10px; padding: 15px; background: white;">
                             <div style="font-weight: bold; margin-bottom: 10px; color: #374151;">
-                                ${icono} ${foto.nombre}
+                                ${icono} ${foto.texto}
                             </div>
                             
                             <!-- Preview de la imagen -->
@@ -789,10 +808,20 @@
                                      onclick="abrirFotoCompleta('${foto.urlVisualizacion}', '${foto.nombre}')"
                                      onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
                                 />
-                                <div style="display: none; color: #6b7280; font-size: 0.9em;">
+                                <div style="display: none; color: #6b7280; font-size: 0.9em; text-align: center;">
                                     📷 Vista previa no disponible<br>
                                     <small>Haz clic en "Ver" para abrir</small>
                                 </div>
+                            </div>
+                            
+                            <!-- Hipervínculo completo copiable -->
+                            <div style="background: #f8f9fa; padding: 8px; border-radius: 4px; margin-bottom: 10px; font-size: 0.8em; word-break: break-all;">
+                                <div style="font-weight: bold; color: #374151; margin-bottom: 4px;">🔗 Hipervínculo:</div>
+                                <input type="text" value="${foto.url}" readonly 
+                                       style="width: 100%; padding: 4px; border: 1px solid #d1d5db; border-radius: 3px; font-size: 0.75em; background: white;"
+                                       onclick="this.select(); navigator.clipboard.writeText(this.value).then(() => mostrarNotificacion('✅ URL copiada')).catch(() => this.select());"
+                                />
+                                <small style="color: #6b7280;">👆 Click para copiar URL</small>
                             </div>
                             
                             <!-- Botones de acción -->
@@ -804,6 +833,10 @@
                                 <button onclick="descargarFoto('${foto.url}', '${foto.nombre}')" 
                                         class="btn-foto" title="Descargar imagen">
                                     ⬇️ Bajar
+                                </button>
+                                <button onclick="copiarHipervinculo('${foto.url}', '${foto.texto}')" 
+                                        class="btn-foto" title="Copiar hipervínculo completo">
+                                    📋 Copiar
                                 </button>
                             </div>
                         </div>
@@ -841,12 +874,28 @@
                         💡 <strong>Cómo usar:</strong><br>
                         • <strong>👁️ Ver:</strong> Abre la imagen en tamaño completo<br>
                         • <strong>⬇️ Bajar:</strong> Descarga la imagen a tu dispositivo<br>
-                        • <strong>🖱️ Click en preview:</strong> También abre la imagen completa
+                        • <strong>📋 Copiar:</strong> Copia el hipervínculo completo<br>
+                        • <strong>🖱️ Click en URL:</strong> Selecciona y copia la URL directamente
                     </div>
                 </div>
             `;
             
             return html;
+        }
+
+        // FUNCIÓN PARA COPIAR HIPERVÍNCULO COMPLETO
+        function copiarHipervinculo(url, texto) {
+            const hipervinculo = `=HIPERVINCULO("${url}";"${texto}")`;
+            
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(hipervinculo).then(() => {
+                    mostrarNotificacion(`✅ Hipervínculo copiado: ${texto}`);
+                }).catch(() => {
+                    mostrarTextoParaCopiar(hipervinculo);
+                });
+            } else {
+                mostrarTextoParaCopiar(hipervinculo);
+            }
         }
 
         // FUNCIÓN PARA ABRIR FOTO COMPLETA
