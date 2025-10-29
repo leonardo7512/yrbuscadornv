@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔍 Buscador NV - Vendedor YR</title>
+    <title>🔍 Buscador NV - Vendedor YR (Optimizado)</title>
     <style>
         * {
             margin: 0;
@@ -233,6 +233,43 @@
             flex-wrap: wrap;
         }
 
+        .foto-gallery {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e1e1e1;
+        }
+
+        .foto-item {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px 12px;
+            background: #e0f2fe;
+            border-radius: 6px;
+            border: 1px solid #0891b2;
+        }
+
+        .foto-item a {
+            color: #0891b2;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .foto-item a:hover {
+            text-decoration: underline;
+        }
+
+        .status-connection {
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .status-success { background: #d1fae5; color: #065f46; }
+        .status-warning { background: #fef3c7; color: #92400e; }
+        .status-error { background: #fee2e2; color: #991b1b; }
+        .status-info { background: #dbeafe; color: #1e40af; }
+
         @media (max-width: 768px) {
             .container {
                 margin: 10px;
@@ -267,11 +304,29 @@
             <h1>🔍 Buscador de Notas de Venta</h1>
             <div class="vendor-badge">👤 Vendedor: YR</div>
             <div style="margin-top: 10px;">
-                <small id="ultimaActualizacion" style="opacity: 0.8;">Cargando datos...</small>
+                <small id="ultimaActualizacion" style="opacity: 0.8;">Inicializando...</small>
             </div>
         </div>
 
         <div class="content">
+            <!-- Estado de conexión mejorado -->
+            <div id="estadoConexionContainer" class="status-connection status-info">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                    <div>
+                        <span id="estadoConexion">🔄 Conectando...</span>
+                        <div style="font-size: 0.9em; margin-top: 3px;">
+                            <span id="metodoConexion"></span>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <button class="btn btn-secondary" onclick="actualizarAhora()" id="btnActualizar" style="padding: 8px 16px; font-size: 14px;">
+                            <span>🔄</span> Actualizar
+                        </button>
+                    </div>
+                </div>
+                <div id="proximaActualizacion" style="font-size: 0.8em; margin-top: 8px;"></div>
+            </div>
+
             <div class="search-section">
                 <h2>🔎 Buscar Nota de Venta</h2>
                 <div class="search-box">
@@ -296,18 +351,13 @@
                 </div>
 
                 <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 20px;">
-                    <button class="btn btn-secondary" onclick="refrescarDatos()" id="btnRefrescar">
-                        <span>🔄</span> Refrescar Ahora
-                    </button>
-                    
                     <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                        <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()" style="margin: 0;">
-                        <span>🔁 Auto-refrescar cada 2 minutos</span>
+                        <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()" checked style="margin: 0;">
+                        <span>🔁 Auto-actualizar cada 90 segundos</span>
                     </label>
                     
-                    <div style="margin-left: auto; text-align: right;">
-                        <div id="estadoConexion" style="font-weight: bold; margin-bottom: 3px;">🔄 Verificando...</div>
-                        <div id="proximaActualizacion" style="font-size: 0.8em; color: #666;"></div>
+                    <div style="margin-left: auto; text-align: right; font-size: 0.9em;">
+                        <div id="tiempoTranscurrido" style="color: #666;"></div>
                     </div>
                 </div>
             </div>
@@ -320,11 +370,12 @@
         // Configuración del vendedor YR
         const VENDEDOR = 'YR';
         
-        // Múltiples URLs para intentar conexión
+        // URLs de conexión optimizadas (ordenadas por velocidad)
         const URLS_CONEXION = {
-            csv_original: 'https://docs.google.com/spreadsheets/d/115hygvTHMNtF0KuQ3AcUgbhjA-WO1Nga3Kjra4wBZX0/export?format=csv&gid=0',
-            csv_alternativo: 'https://docs.google.com/spreadsheets/d/115hygvTHMNtF0KuQ3AcUgbhjA-WO1Nga3Kjra4wBZX0/gviz/tq?tqx=out:csv&sheet=Registros',
-            json_api: 'https://docs.google.com/spreadsheets/d/115hygvTHMNtF0KuQ3AcUgbhjA-WO1Nga3Kjra4wBZX0/gviz/tq?tqx=out:json&sheet=Registros'
+            json_directo: 'https://docs.google.com/spreadsheets/d/115hygvTHMNtF0KuQ3AcUgbhjA-WO1Nga3Kjra4wBZX0/gviz/tq?tqx=out:json&sheet=Registros&headers=1',
+            csv_directo: 'https://docs.google.com/spreadsheets/d/115hygvTHMNtF0KuQ3AcUgbhjA-WO1Nga3Kjra4wBZX0/export?format=csv&gid=0',
+            proxy_allorigins: 'https://api.allorigins.win/raw?url=',
+            proxy_cors: 'https://cors-anywhere.herokuapp.com/'
         };
 
         // Variables globales
@@ -333,13 +384,13 @@
         let ultimaActualizacion = null;
         let intervalRefresh = null;
         let datosOriginales = '';
+        let metodoConexionActual = '';
+        let timeoutConexion = 8000; // 8 segundos timeout
+        let inicioConexion = null;
 
         // Cargar datos al inicio
         window.addEventListener('load', function() {
-            cargarDatos();
-            // Auto-refrescar cada 2 minutos por defecto
-            document.getElementById('autoRefresh').checked = true;
-            toggleAutoRefresh();
+            inicializarSistema();
         });
 
         // Permitir buscar con Enter
@@ -349,19 +400,49 @@
             }
         });
 
-        // FUNCIÓN PRINCIPAL MEJORADA
-        async function cargarDatos(mostrarNotif = true) {
+        async function inicializarSistema() {
+            actualizarEstadoConexion('🚀 Iniciando sistema...', 'info');
+            
+            // Activar auto-refresh por defecto
+            document.getElementById('autoRefresh').checked = true;
+            
+            // Cargar datos inicial
+            await cargarDatosOptimizado(true);
+            
+            // Iniciar auto-refresh
+            toggleAutoRefresh();
+            
+            // Iniciar contador de tiempo
+            iniciarContadorTiempo();
+        }
+
+        // SISTEMA DE CARGA OPTIMIZADO - CONEXIONES EN PARALELO
+        async function cargarDatosOptimizado(mostrarNotif = true) {
             try {
+                inicioConexion = Date.now();
                 if (mostrarNotif) mostrarCargando();
                 
-                actualizarEstadoConexion('🔄 Conectando...', 'info');
-                console.log('📊 Conectando con Google Sheets...');
+                actualizarEstadoConexion('⚡ Conectando en paralelo...', 'info');
+                console.log('📊 Iniciando conexión optimizada...');
                 
-                // Intentar múltiples métodos en orden
-                await intentarTodosLosMétodos(mostrarNotif);
+                // Intentar múltiples métodos EN PARALELO
+                const promesasConexion = [
+                    intentarJSONPRapido(),
+                    intentarCSVDirecto(),
+                    intentarConProxy()
+                ];
+                
+                // Usar Promise.race para obtener el primer resultado exitoso
+                const resultado = await Promise.race(promesasConexion);
+                
+                if (resultado.exito) {
+                    finalizarCargaDatos(resultado.metodo, mostrarNotif, resultado.hayNuevosDatos);
+                } else {
+                    throw new Error('Todos los métodos fallaron');
+                }
                 
             } catch (error) {
-                console.error('❌ Todos los métodos fallaron:', error);
+                console.error('❌ Error en carga optimizada:', error);
                 actualizarEstadoConexion('❌ Sin conexión', 'error');
                 
                 if (mostrarNotif) {
@@ -371,156 +452,213 @@
             }
         }
 
-        // INTENTAR TODOS LOS MÉTODOS DISPONIBLES
-        async function intentarTodosLosMétodos(mostrarNotif = true) {
-            const métodos = [
-                { nombre: 'JSONP directo', función: () => cargarConJSONP() },
-                { nombre: 'Proxy AllOrigins', función: () => cargarConProxy('https://api.allorigins.win/raw?url=', URLS_CONEXION.csv_original, mostrarNotif) },
-                { nombre: 'Proxy CORS Anywhere', función: () => cargarConProxy('https://cors-anywhere.herokuapp.com/', URLS_CONEXION.csv_original, mostrarNotif) },
-                { nombre: 'CSV alternativo directo', función: () => cargarDatosDirecto(URLS_CONEXION.csv_alternativo, mostrarNotif) },
-                { nombre: 'CSV original directo', función: () => cargarDatosDirecto(URLS_CONEXION.csv_original, mostrarNotif) }
-            ];
-            
-            for (const método of métodos) {
-                try {
-                    console.log(`🔄 Intentando: ${método.nombre}`);
-                    await método.función();
-                    console.log(`✅ Éxito con: ${método.nombre}`);
-                    return; // Salir al primer éxito
-                } catch (error) {
-                    console.log(`❌ ${método.nombre} falló:`, error.message);
-                    continue;
-                }
-            }
-            
-            throw new Error('Ningún método de conexión funcionó');
-        }
-
-        // MÉTODO 1: JSONP (MÁS COMPATIBLE)
-        async function cargarConJSONP() {
+        // MÉTODO 1: JSONP OPTIMIZADO
+        async function intentarJSONPRapido() {
             return new Promise((resolve, reject) => {
-                const callbackName = 'gsc_' + Date.now();
+                const timeoutId = setTimeout(() => {
+                    cleanup();
+                    reject(new Error('Timeout JSONP'));
+                }, timeoutConexion);
+                
+                const callbackName = 'gsc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                let script;
+                
+                const cleanup = () => {
+                    clearTimeout(timeoutId);
+                    if (script && script.parentNode) {
+                        script.parentNode.removeChild(script);
+                    }
+                    if (window[callbackName]) {
+                        delete window[callbackName];
+                    }
+                };
                 
                 window[callbackName] = function(response) {
                     try {
-                        // Limpiar
-                        if (script && script.parentNode) {
-                            script.parentNode.removeChild(script);
-                        }
-                        delete window[callbackName];
+                        cleanup();
                         
                         if (response && response.table && response.table.rows) {
-                            // Extraer encabezados
                             const cols = response.table.cols || [];
                             encabezados = cols.map(col => col.label || col.id || '');
                             
-                            // Extraer datos
                             datosCompletos = response.table.rows.map(row => {
                                 return row.c ? row.c.map(cell => {
                                     if (!cell) return '';
-                                    return cell.f || cell.v || ''; // f = formatted value, v = raw value
+                                    return cell.f || cell.v || '';
                                 }) : [];
                             });
                             
-                            console.log(`✅ JSONP: ${encabezados.length} columnas, ${datosCompletos.length} filas`);
+                            const tiempoConexion = Date.now() - inicioConexion;
+                            console.log(`✅ JSONP exitoso en ${tiempoConexion}ms`);
                             
-                            finalizarCargaDatos('JSONP', true);
-                            resolve(true);
+                            resolve({
+                                exito: true,
+                                metodo: `JSONP directo (${tiempoConexion}ms)`,
+                                hayNuevosDatos: true
+                            });
                         } else {
                             reject(new Error('Respuesta JSONP inválida'));
                         }
                     } catch (error) {
+                        cleanup();
                         reject(error);
                     }
                 };
                 
-                const script = document.createElement('script');
-                script.src = URLS_CONEXION.json_api + '&tqx=out:json;responseHandler:' + callbackName;
-                script.onerror = () => reject(new Error('Error cargando script JSONP'));
+                script = document.createElement('script');
+                script.src = URLS_CONEXION.json_directo + '&tqx=out:json;responseHandler:' + callbackName;
+                script.onerror = () => {
+                    cleanup();
+                    reject(new Error('Error script JSONP'));
+                };
                 
                 document.head.appendChild(script);
-                
-                // Timeout
-                setTimeout(() => {
-                    if (window[callbackName]) {
-                        if (script && script.parentNode) {
-                            script.parentNode.removeChild(script);
-                        }
-                        delete window[callbackName];
-                        reject(new Error('Timeout JSONP (10s)'));
-                    }
-                }, 10000);
             });
         }
 
-        // MÉTODO 2: CON PROXY
-        async function cargarConProxy(proxyUrl, targetUrl, mostrarNotif = true) {
-            const url = proxyUrl + encodeURIComponent(targetUrl);
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                throw new Error(`Error proxy: ${response.status}`);
+        // MÉTODO 2: CSV DIRECTO OPTIMIZADO
+        async function intentarCSVDirecto() {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), timeoutConexion);
+                
+                const response = await fetch(URLS_CONEXION.csv_directo, {
+                    signal: controller.signal,
+                    cache: 'no-cache'
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const csvText = await response.text();
+                const hayNuevosDatos = csvText !== datosOriginales;
+                datosOriginales = csvText;
+                
+                procesarCSVOptimizado(csvText);
+                
+                const tiempoConexion = Date.now() - inicioConexion;
+                console.log(`✅ CSV directo exitoso en ${tiempoConexion}ms`);
+                
+                return {
+                    exito: true,
+                    metodo: `CSV directo (${tiempoConexion}ms)`,
+                    hayNuevosDatos
+                };
+                
+            } catch (error) {
+                console.log('❌ CSV directo falló:', error.message);
+                throw error;
             }
-            
-            const csvText = await response.text();
-            procesarCSV(csvText, `proxy: ${proxyUrl}`, mostrarNotif);
         }
 
-        // MÉTODO 3: DIRECTO
-        async function cargarDatosDirecto(url, mostrarNotif = true) {
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                throw new Error(`Error HTTP: ${response.status}`);
+        // MÉTODO 3: CON PROXY (RESPALDO)
+        async function intentarConProxy() {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), timeoutConexion);
+                
+                const url = URLS_CONEXION.proxy_allorigins + encodeURIComponent(URLS_CONEXION.csv_directo);
+                const response = await fetch(url, {
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    throw new Error(`Proxy error: ${response.status}`);
+                }
+                
+                const csvText = await response.text();
+                const hayNuevosDatos = csvText !== datosOriginales;
+                datosOriginales = csvText;
+                
+                procesarCSVOptimizado(csvText);
+                
+                const tiempoConexion = Date.now() - inicioConexion;
+                console.log(`✅ Proxy exitoso en ${tiempoConexion}ms`);
+                
+                return {
+                    exito: true,
+                    metodo: `Proxy (${tiempoConexion}ms)`,
+                    hayNuevosDatos
+                };
+                
+            } catch (error) {
+                console.log('❌ Proxy falló:', error.message);
+                throw error;
             }
-            
-            const csvText = await response.text();
-            procesarCSV(csvText, 'directo', mostrarNotif);
         }
 
-        // PROCESAR CSV
-        function procesarCSV(csvText, metodo, mostrarNotif = true) {
-            console.log(`✅ CSV obtenido via: ${metodo}`);
-            console.log(`📄 Tamaño: ${csvText.length} caracteres`);
+        // PROCESADOR CSV OPTIMIZADO
+        function procesarCSVOptimizado(csvText) {
+            const lineas = csvText.split(/\r?\n/);
+            const datos = [];
             
-            const hayNuevosDatos = csvText !== datosOriginales;
-            datosOriginales = csvText;
-            
-            const datos = parseCSVAvanzado(csvText);
+            for (let i = 0; i < lineas.length; i++) {
+                const linea = lineas[i].trim();
+                if (linea) {
+                    datos.push(parseCSVLinea(linea));
+                }
+            }
             
             if (datos.length > 0) {
                 encabezados = datos[0];
                 datosCompletos = datos.slice(1);
-                
-                finalizarCargaDatos(metodo, mostrarNotif, hayNuevosDatos);
-            } else {
-                throw new Error('No se pudieron procesar los datos CSV');
             }
         }
 
-        // FINALIZAR CARGA DE DATOS
-        function finalizarCargaDatos(metodo, mostrarNotif = true, hayNuevosDatos = false) {
-            console.log(`📋 Encabezados: ${encabezados.length} columnas`);
-            console.log(`📊 Registros: ${datosCompletos.length} filas`);
+        function parseCSVLinea(linea) {
+            const resultado = [];
+            let actual = '';
+            let dentroComillas = false;
             
-            // Contar registros del vendedor
+            for (let i = 0; i < linea.length; i++) {
+                const char = linea[i];
+                const siguiente = linea[i + 1];
+                
+                if (char === '"') {
+                    if (dentroComillas && siguiente === '"') {
+                        actual += '"';
+                        i++;
+                    } else {
+                        dentroComillas = !dentroComillas;
+                    }
+                } else if (char === ',' && !dentroComillas) {
+                    resultado.push(actual.trim());
+                    actual = '';
+                } else {
+                    actual += char;
+                }
+            }
+            
+            resultado.push(actual.trim());
+            return resultado;
+        }
+
+        // FINALIZAR CARGA OPTIMIZADA
+        function finalizarCargaDatos(metodo, mostrarNotif = true, hayNuevosDatos = false) {
             const misRegistros = datosCompletos.filter(row => {
                 const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
                 const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
                 return vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR;
             });
             
-            console.log(`👤 Registros para ${VENDEDOR}: ${misRegistros.length}`);
-            
-            // Actualizar estado
             ultimaActualizacion = new Date();
+            metodoConexionActual = metodo;
+            
             actualizarUltimaActualizacion();
-            actualizarEstadoConexion(`✅ Conectado (${metodo})`, 'success');
+            actualizarEstadoConexion(`✅ Conectado`, 'success');
+            actualizarMetodoConexion(metodo);
+            
+            console.log(`📊 ${datosCompletos.length} registros total, ${misRegistros.length} para ${VENDEDOR}`);
             
             if (mostrarNotif) {
                 const mensaje = hayNuevosDatos ? 
-                    `🆕 ${datosCompletos.length} registros actualizados (${misRegistros.length} para ${VENDEDOR})` :
-                    `✅ ${datosCompletos.length} registros cargados (${misRegistros.length} para ${VENDEDOR})`;
+                    `🆕 Datos actualizados: ${misRegistros.length} NV para ${VENDEDOR}` :
+                    `✅ ${misRegistros.length} NV cargadas para ${VENDEDOR}`;
                 
                 mostrarNotificacion(mensaje);
                 ocultarCargando();
@@ -529,77 +667,7 @@
             }
         }
 
-        // Parser CSV avanzado
-        function parseCSVAvanzado(csv) {
-            const result = [];
-            let current = '';
-            let inQuotes = false;
-            let row = [];
-            
-            for (let i = 0; i < csv.length; i++) {
-                const char = csv[i];
-                const nextChar = csv[i + 1];
-                
-                if (char === '"') {
-                    if (inQuotes && nextChar === '"') {
-                        // Comillas escapadas ""
-                        current += '"';
-                        i++; // Saltar la siguiente comilla
-                    } else {
-                        // Cambiar estado de comillas
-                        inQuotes = !inQuotes;
-                    }
-                } else if (char === ',' && !inQuotes) {
-                    // Nueva columna
-                    row.push(current.trim());
-                    current = '';
-                } else if ((char === '\n' || char === '\r') && !inQuotes) {
-                    // Nueva fila
-                    if (char === '\r' && nextChar === '\n') {
-                        i++; // Saltar \r\n
-                    }
-                    
-                    row.push(current.trim());
-                    
-                    // Solo agregar filas que no estén completamente vacías
-                    if (row.some(cell => cell !== '')) {
-                        result.push(row);
-                    }
-                    
-                    row = [];
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            
-            // Agregar última fila si existe contenido
-            if (current !== '' || row.length > 0) {
-                row.push(current.trim());
-                if (row.some(cell => cell !== '')) {
-                    result.push(row);
-                }
-            }
-            
-            return result;
-        }
-
-        // Función de respaldo con datos de ejemplo
-        async function simularCargaDatos() {
-            console.log('🔄 Cargando datos de ejemplo...');
-            
-            datosCompletos = [
-                ['2025-08-20 14:30', '25610', '20', 'YR', 'PAGADO', 'Transferencia', 'Foto NV1', '', '', 'YRT', '25610', 'NV', 'YR', 'AM', '2025-08-20 14:45:01', 'Productos de limpieza hogar', '2025-08-20 14:45:01', 'Doc', 'F1', 'F2', '', '', '', '', '', '', '', '', 'AM', 'Cliente Martinez', 'Retiro', '', '1', '2025-08-20', ''],
-                ['2025-08-20 13:15', '25605', '19', 'YR', 'PAGADO', 'Efectivo', 'Foto NV1', '', '', 'YRT', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Lopez familia', 'Envío', 'STARKEN', '1', '2025-08-20', ''],
-                ['2025-08-20 12:00', '25600', '18', 'YR', 'PENDIENTE', 'Por confirmar', 'Foto NV1', '', '', 'YRT', '25600', 'NV', 'YR', 'CQ', '2025-08-20 12:30:30', 'Artículos de oficina', '2025-08-20 12:30:30', 'Doc', 'F1', '', '', '', '', '', '', '', '', '', 'CQ', 'Empresa ABC', '', '', '', '', '']
-            ];
-
-            encabezados = ['FECHA', 'Numero NV', 'Turno NV', 'Vendedor NV', 'Status NV', 'Observaciones NV', 'Foto NV 1 Link', 'Foto NV 2 Link', 'Foto NV 3 Link', 'Usuario', 'Numero NV 2', 'Origen', 'Vendedor', 'Ejecutor', 'FECHA', 'Descripción', 'Fecha Verif', 'Doc PPAL', 'Foto 1', 'Foto 2', 'Foto 3', 'Foto 4', 'Foto 5', 'Foto 6', 'Foto 7', 'Foto 8', 'Foto 9', 'Foto 10', 'ENTREGADO POR', 'RECIBIDO POR', 'FOTO 1 ENTREGA', 'FOTO 2 ENT', 'FOTO 3 ENT', 'ENTREGADO EL', 'ARMADO POR', 'CLIENTE', 'TIPO DE ENVIO', 'COURRIER', 'BULTOS', 'FECHA', 'Reporte Impreso'];
-
-            mostrarNotificacion('⚠️ Usando datos de ejemplo. Configura acceso público en Google Sheets.');
-            ocultarCargando();
-        }
-
+        // FUNCIONES DE BÚSQUEDA (MEJORADAS)
         function buscarNotaVenta() {
             const numeroNV = document.getElementById('numeroNV').value.trim();
             
@@ -611,12 +679,11 @@
             const resultado = buscarNVenDatos(numeroNV);
             
             if (resultado.encontrada) {
-                // Verificar si pertenece al vendedor YR
                 const vendedorNV = resultado.data[3] ? resultado.data[3].toString().toUpperCase() : '';
                 const vendedorProceso = resultado.data[12] ? resultado.data[12].toString().toUpperCase() : '';
                 
                 if (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) {
-                    mostrarResultado(resultado);
+                    mostrarResultadoMejorado(resultado);
                 } else {
                     mostrarError(`La Nota de Venta ${numeroNV} no pertenece al vendedor ${VENDEDOR}.`);
                 }
@@ -638,68 +705,32 @@
             return { encontrada: false };
         }
 
-        function buscarTodasMisNV() {
-            const misNV = datosCompletos.filter(row => {
-                const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
-                const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
-                return vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR;
-            });
-
-            if (misNV.length > 0) {
-                mostrarListaNV(misNV, `📋 Todas las NV del vendedor ${VENDEDOR} (${misNV.length} encontradas)`);
-            } else {
-                mostrarError(`No se encontraron Notas de Venta para el vendedor ${VENDEDOR}.`);
-            }
-        }
-
-        function buscarPendientes() {
-            const misNV = datosCompletos.filter(row => {
-                const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
-                const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
-                // ARREGLO: Chequear si el despacho está definido (columna 36) en vez de si fue entregado.
-                const despachoDefinido = row[36] && row[36].toString().trim() !== '';
-                
-                return (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) && !despachoDefinido;
-            });
-
-            if (misNV.length > 0) {
-                mostrarListaNV(misNV, `⏳ NV Por Definir del vendedor ${VENDEDOR} (${misNV.length} encontradas)`);
-            } else {
-                mostrarInfo(`✅ No hay NV con despacho por definir para el vendedor ${VENDEDOR}.`);
-            }
-        }
-
-        function buscarCompletadas() {
-            const misNV = datosCompletos.filter(row => {
-                const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
-                const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
-                 // ARREGLO: Chequear si el despacho está definido (columna 36).
-                const despachoDefinido = row[36] && row[36].toString().trim() !== '';
-                
-                return (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) && despachoDefinido;
-            });
-
-            if (misNV.length > 0) {
-                mostrarListaNV(misNV, `✅ NV con Despacho Definido del vendedor ${VENDEDOR} (${misNV.length} encontradas)`);
-            } else {
-                mostrarInfo(`No hay NV con despacho definido para el vendedor ${VENDEDOR}.`);
-            }
-        }
-
-        function mostrarResultado(resultado) {
+        // MOSTRAR RESULTADO MEJORADO CON FECHAS Y FOTOS
+        function mostrarResultadoMejorado(resultado) {
             const data = resultado.data;
             const numeroNV = data[1] || 'Sin número';
             
-            // ARREGLO: La lógica principal ahora se basa en si el despacho está definido.
+            // Detectar fechas con formato mejorado
+            const fechaCreacion = formatearFechaHora(data[0]);
+            const fechaProceso = formatearFechaHora(data[14]);
+            const fechaProgramada = formatearFechaHora(data[39]);
+            const fechaEntrega = formatearFechaHora(data[33]);
+            
+            // Lógica de fases
             const tieneEjecutor = data[13] && data[13].toString().trim() !== '';
             const tieneArmado = data[34] && data[34].toString().trim() !== '';
             const despachoDefinido = data[36] && data[36].toString().trim() !== '';
             const entregaConfirmada = data[28] && data[28].toString().trim() !== '';
-
+            
+            // Detectar fotos
+            const fotos = detectarFotos(data);
 
             let html = `
                 <div class="result-container success">
                     <h3>✅ Nota de Venta ${numeroNV} Encontrada</h3>
+                    <div style="font-size: 0.9em; color: #666; margin-bottom: 20px;">
+                        📅 Consultado: ${new Date().toLocaleString('es-CL')}
+                    </div>
                     
                     <div class="info-grid">
                         <div class="info-item">
@@ -715,8 +746,8 @@
                             <div class="info-value">${data[3] || 'Sin vendedor'}</div>
                         </div>
                         <div class="info-item">
-                            <div class="info-label">📅 Fecha</div>
-                            <div class="info-value">${data[0] || 'Sin fecha'}</div>
+                            <div class="info-label">📅 Fecha Creación</div>
+                            <div class="info-value">${fechaCreacion}</div>
                         </div>
                         <div class="info-item">
                             <div class="info-label">📝 Descripción</div>
@@ -733,12 +764,16 @@
                         </div>
                          <div class="info-grid">
                             <div class="info-item">
-                                <div class="info-label">📅 Fecha creación</div>
-                                <div class="info-value">${data[0] || 'No especificada'}</div>
+                                <div class="info-label">📅 Fecha y Hora</div>
+                                <div class="info-value">${fechaCreacion}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">👤 Vendedor</div>
                                 <div class="info-value">${data[3] || 'No especificado'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">🔢 Turno</div>
+                                <div class="info-value">${data[2] || 'No especificado'}</div>
                             </div>
                         </div>
                     </div>
@@ -765,8 +800,8 @@
                                     </div>
                                 ` : ''}
                                 <div class="info-item">
-                                    <div class="info-label">📅 Fecha proceso</div>
-                                    <div class="info-value">${data[14] || 'No especificada'}</div>
+                                    <div class="info-label">📅 Fecha Proceso</div>
+                                    <div class="info-value">${fechaProceso}</div>
                                 </div>
                             </div>
                         ` : `
@@ -783,52 +818,14 @@
                                 ${despachoDefinido ? '✅ DEFINIDO' : '⏳ POR DEFINIR'}
                             </span>
                         </div>
-                        ${despachoDefinido ? `
-                            <div class="info-grid">
-                                <div class="info-item">
-                                    <div class="info-label">🚚 Tipo de Despacho</div>
-                                    <div class="info-value">${data[36] || 'No especificado'}</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-label">📦 Courier</div>
-                                    <div class="info-value">${data[37] || 'No especificado'}</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-label">📊 Bultos</div>
-                                    <div class="info-value">${data[38] || 'No especificado'}</div>
-                                </div>
-                                <div class="info-item">
-                                    <div class="info-label">📅 Fecha Programada</div>
-                                    <div class="info-value">${data[39] || 'No especificada'}</div>
-                                </div>
-                            </div>
-                            ${entregaConfirmada ? `
-                                <h5 style="margin-top: 20px; margin-bottom: 10px; border-top: 1px solid #eee; padding-top: 15px;">Confirmación de Entrega</h5>
-                                <div class="info-grid">
-                                    <div class="info-item">
-                                        <div class="info-label">👤 Entregado por</div>
-                                        <div class="info-value">${data[28]}</div>
-                                    </div>
-                                    <div class="info-item">
-                                        <div class="info-label">✍️ Recibido por</div>
-                                        <div class="info-value">${data[29] || 'No especificado'}</div>
-                                    </div>
-                                    <div class="info-item">
-                                        <div class="info-label">📅 Fecha Entrega</div>
-                                        <div class="info-value">${data[33] || 'No especificada'}</div>
-                                    </div>
-                                </div>
-                            ` : `
-                                <div style="color: #92400e; font-style: italic; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
-                                    ⏳ Entrega final pendiente.
-                                </div>
-                            `}
-                        ` : `
+                        ${despachoDefinido ? generarInfoDespacho(data, fechaProgramada, fechaEntrega, entregaConfirmada) : `
                             <div style="color: #92400e; font-style: italic;">
                                 ⏳ Despacho por definir.
                             </div>
                         `}
                     </div>
+
+                    ${fotos.length > 0 ? generarGaleriaFotos(fotos) : ''}
 
                     <div class="export-section">
                         <h4>📤 Opciones de Exportación</h4>
@@ -847,6 +844,265 @@
             document.getElementById('resultados').innerHTML = html;
         }
 
+        // FUNCIÓN PARA FORMATEAR FECHA Y HORA MEJORADA
+        function formatearFechaHora(fechaStr) {
+            if (!fechaStr || fechaStr.toString().trim() === '') {
+                return 'No especificada';
+            }
+            
+            const fecha = fechaStr.toString().trim();
+            
+            // Detectar si tiene hora (contiene :)
+            if (fecha.includes(':')) {
+                // Tiene hora completa
+                try {
+                    const fechaObj = new Date(fecha);
+                    if (!isNaN(fechaObj.getTime())) {
+                        return `📅 ${fechaObj.toLocaleDateString('es-CL')} ⏰ ${fechaObj.toLocaleTimeString('es-CL')}`;
+                    }
+                } catch (e) {
+                    // Si falla el parsing, devolver tal como está
+                }
+                return `📅 ${fecha}`;
+            } else {
+                // Solo fecha
+                return `📅 ${fecha}`;
+            }
+        }
+
+        // FUNCIÓN PARA GENERAR INFO DE DESPACHO INTELIGENTE
+        function generarInfoDespacho(data, fechaProgramada, fechaEntrega, entregaConfirmada) {
+            const tipoDespacho = data[36] ? data[36].toString().toUpperCase() : '';
+            const courier = data[37] && data[37].toString().trim() !== '' ? data[37] : null;
+            const bultos = data[38] || 'No especificado';
+            
+            let html = '<div class="info-grid">';
+            
+            // Tipo de despacho
+            html += `
+                <div class="info-item">
+                    <div class="info-label">${tipoDespacho === 'RETIRO' ? '🏪' : '🚚'} Tipo de Despacho</div>
+                    <div class="info-value">${data[36]}</div>
+                </div>
+            `;
+            
+            // Courier - solo si aplica
+            if (tipoDespacho === 'ENVÍO' || tipoDespacho === 'ENVIO') {
+                html += `
+                    <div class="info-item">
+                        <div class="info-label">📦 Courier</div>
+                        <div class="info-value">${courier || 'Por definir'}</div>
+                    </div>
+                `;
+            } else if (tipoDespacho === 'RETIRO') {
+                html += `
+                    <div class="info-item">
+                        <div class="info-label">🏪 Lugar de Retiro</div>
+                        <div class="info-value">Sucursal (según política)</div>
+                    </div>
+                `;
+            }
+            
+            // Bultos y fecha
+            html += `
+                <div class="info-item">
+                    <div class="info-label">📊 Bultos</div>
+                    <div class="info-value">${bultos}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">📅 Fecha Programada</div>
+                    <div class="info-value">${fechaProgramada}</div>
+                </div>
+            `;
+            
+            html += '</div>';
+            
+            // Información de entrega si está confirmada
+            if (entregaConfirmada) {
+                html += `
+                    <h5 style="margin-top: 20px; margin-bottom: 10px; border-top: 1px solid #eee; padding-top: 15px;">✅ Confirmación de Entrega</h5>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <div class="info-label">👤 Entregado por</div>
+                            <div class="info-value">${data[28]}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">✍️ Recibido por</div>
+                            <div class="info-value">${data[29] || 'No especificado'}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">📅 Fecha y Hora Entrega</div>
+                            <div class="info-value">${fechaEntrega}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div style="color: #92400e; font-style: italic; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                        ⏳ Entrega final pendiente.
+                    </div>
+                `;
+            }
+            
+            return html;
+        }
+
+        // DETECTAR Y ORGANIZAR FOTOS
+        function detectarFotos(data) {
+            const fotos = [];
+            
+            // Mapeo de columnas con fotos (ajustar según tu estructura)
+            const columnasFotos = [
+                { indice: 6, nombre: 'Foto NV 1', fase: 'creacion' },
+                { indice: 7, nombre: 'Foto NV 2', fase: 'creacion' },
+                { indice: 8, nombre: 'Foto NV 3', fase: 'creacion' },
+                { indice: 18, nombre: 'Foto Proceso 1', fase: 'proceso' },
+                { indice: 19, nombre: 'Foto Proceso 2', fase: 'proceso' },
+                { indice: 20, nombre: 'Foto Proceso 3', fase: 'proceso' },
+                { indice: 21, nombre: 'Foto Proceso 4', fase: 'proceso' },
+                { indice: 22, nombre: 'Foto Proceso 5', fase: 'proceso' },
+                { indice: 23, nombre: 'Foto Proceso 6', fase: 'proceso' },
+                { indice: 24, nombre: 'Foto Proceso 7', fase: 'proceso' },
+                { indice: 25, nombre: 'Foto Proceso 8', fase: 'proceso' },
+                { indice: 26, nombre: 'Foto Proceso 9', fase: 'proceso' },
+                { indice: 27, nombre: 'Foto Proceso 10', fase: 'proceso' },
+                { indice: 30, nombre: 'Foto Entrega 1', fase: 'entrega' },
+                { indice: 31, nombre: 'Foto Entrega 2', fase: 'entrega' },
+                { indice: 32, nombre: 'Foto Entrega 3', fase: 'entrega' }
+            ];
+            
+            columnasFotos.forEach(col => {
+                const url = data[col.indice];
+                if (url && url.toString().trim() !== '' && url.toString().includes('http')) {
+                    fotos.push({
+                        nombre: col.nombre,
+                        url: url.toString().trim(),
+                        fase: col.fase
+                    });
+                }
+            });
+            
+            return fotos;
+        }
+
+        // GENERAR GALERÍA DE FOTOS
+        function generarGaleriaFotos(fotos) {
+            const fotosPorFase = {
+                creacion: fotos.filter(f => f.fase === 'creacion'),
+                proceso: fotos.filter(f => f.fase === 'proceso'),
+                entrega: fotos.filter(f => f.fase === 'entrega')
+            };
+            
+            let html = `
+                <div class="foto-gallery">
+                    <h4>📸 Galería de Fotos (${fotos.length} encontradas)</h4>
+            `;
+            
+            Object.entries(fotosPorFase).forEach(([fase, fotosFase]) => {
+                if (fotosFase.length > 0) {
+                    const faseNombre = {
+                        creacion: '📋 Creación',
+                        proceso: '🔧 Proceso',
+                        entrega: '📦 Entrega'
+                    };
+                    
+                    html += `
+                        <h5 style="margin-top: 15px; margin-bottom: 8px;">${faseNombre[fase]} (${fotosFase.length})</h5>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    `;
+                    
+                    fotosFase.forEach((foto, index) => {
+                        const esGoogleDrive = foto.url.includes('drive.google.com');
+                        const urlVisualizacion = esGoogleDrive ? 
+                            foto.url.replace('/file/d/', '/uc?id=').replace('/view', '').replace('?usp=sharing', '') :
+                            foto.url;
+                        
+                        html += `
+                            <div class="foto-item">
+                                <a href="${urlVisualizacion}" target="_blank" title="Ver ${foto.nombre}">
+                                    📷 ${foto.nombre}
+                                </a>
+                                <button onclick="descargarFoto('${urlVisualizacion}', '${foto.nombre}')" 
+                                        style="margin-left: 8px; border: none; background: none; cursor: pointer; color: #0891b2;" 
+                                        title="Descargar">⬇️</button>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                }
+            });
+            
+            html += '</div>';
+            return html;
+        }
+
+        // FUNCIÓN PARA DESCARGAR FOTOS
+        function descargarFoto(url, nombre) {
+            try {
+                // Crear enlace temporal para descarga
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = nombre || 'foto';
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                mostrarNotificacion(`📷 Abriendo ${nombre} para descarga`);
+            } catch (error) {
+                console.error('Error al descargar foto:', error);
+                mostrarError('No se pudo abrir la foto. Verifica los permisos del archivo.');
+            }
+        }
+
+        // RESTO DE FUNCIONES DE BÚSQUEDA (sin cambios en lógica)
+        function buscarTodasMisNV() {
+            const misNV = datosCompletos.filter(row => {
+                const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
+                const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
+                return vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR;
+            });
+
+            if (misNV.length > 0) {
+                mostrarListaNV(misNV, `📋 Todas las NV del vendedor ${VENDEDOR} (${misNV.length} encontradas)`);
+            } else {
+                mostrarError(`No se encontraron Notas de Venta para el vendedor ${VENDEDOR}.`);
+            }
+        }
+
+        function buscarPendientes() {
+            const misNV = datosCompletos.filter(row => {
+                const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
+                const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
+                const despachoDefinido = row[36] && row[36].toString().trim() !== '';
+                
+                return (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) && !despachoDefinido;
+            });
+
+            if (misNV.length > 0) {
+                mostrarListaNV(misNV, `⏳ NV Por Definir del vendedor ${VENDEDOR} (${misNV.length} encontradas)`);
+            } else {
+                mostrarInfo(`✅ No hay NV con despacho por definir para el vendedor ${VENDEDOR}.`);
+            }
+        }
+
+        function buscarCompletadas() {
+            const misNV = datosCompletos.filter(row => {
+                const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
+                const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
+                const despachoDefinido = row[36] && row[36].toString().trim() !== '';
+                
+                return (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) && despachoDefinido;
+            });
+
+            if (misNV.length > 0) {
+                mostrarListaNV(misNV, `✅ NV con Despacho Definido del vendedor ${VENDEDOR} (${misNV.length} encontradas)`);
+            } else {
+                mostrarInfo(`No hay NV con despacho definido para el vendedor ${VENDEDOR}.`);
+            }
+        }
+
         function mostrarListaNV(nvList, titulo) {
             let html = `
                 <div class="result-container success">
@@ -858,8 +1114,7 @@
                 const numeroNV = nv[1] || 'Sin número';
                 const cliente = nv[35] || 'Sin cliente';
                 const status = nv[4] || 'Sin status';
-                const fecha = nv[0] || 'Sin fecha';
-                // ARREGLO: Chequear si el despacho está definido (columna 36).
+                const fecha = formatearFechaHora(nv[0]);
                 const despachoDefinido = nv[36] && nv[36].toString().trim() !== '';
 
                 html += `
@@ -873,7 +1128,7 @@
                                 <div class="status-badge ${despachoDefinido ? 'status-completed' : 'status-pending'}">
                                     ${despachoDefinido ? '✅ Despacho Definido' : '⏳ Por Definir'}
                                 </div>
-                                <small style="display: block; margin-top: 5px;">📅 ${fecha}</small>
+                                <small style="display: block; margin-top: 5px;">${fecha}</small>
                             </div>
                         </div>
                     </div>
@@ -893,6 +1148,7 @@
             buscarNotaVenta();
         }
 
+        // FUNCIONES DE EXPORTACIÓN (sin cambios)
         function exportarInformeRapido(numeroNV) {
             const resultado = buscarNVenDatos(numeroNV);
             if (!resultado.encontrada) return;
@@ -1006,42 +1262,79 @@
             copiarAlPortapapeles(informe);
         }
 
-        // --- FUNCIONES AUXILIARES (sin cambios) ---
-
-        async function refrescarDatos() {
-            const btn = document.getElementById('btnRefrescar');
+        // FUNCIONES DE SISTEMA (OPTIMIZADAS)
+        async function actualizarAhora() {
+            const btn = document.getElementById('btnActualizar');
             const originalText = btn.innerHTML;
-            btn.innerHTML = '<span>⏳</span> Refrescando...';
+            btn.innerHTML = '<span>⏳</span> Actualizando...';
             btn.disabled = true;
-            await cargarDatos(true);
-            btn.innerHTML = originalText;
-            btn.disabled = false;
+            
+            try {
+                await cargarDatosOptimizado(true);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
         }
 
         function toggleAutoRefresh() {
             const checkbox = document.getElementById('autoRefresh');
+            
             if (intervalRefresh) {
                 clearInterval(intervalRefresh);
                 intervalRefresh = null;
             }
+            
             if (checkbox.checked) {
                 intervalRefresh = setInterval(async () => {
-                    console.log('🔄 Auto-refresh activado');
-                    await cargarDatos(false);
-                }, 120000);
-                iniciarContadorProximaActualizacion();
-                console.log('✅ Auto-refresh activado (cada 2 minutos)');
+                    console.log('🔄 Auto-refresh ejecutándose...');
+                    await cargarDatosOptimizado(false);
+                }, 90000); // 90 segundos
+                
+                actualizarProximaActualizacion('Auto-refresh activo cada 90 segundos');
+                console.log('✅ Auto-refresh activado (cada 90 segundos)');
             } else {
                 actualizarProximaActualizacion('Auto-refresh desactivado');
                 console.log('❌ Auto-refresh desactivado');
             }
         }
 
+        function iniciarContadorTiempo() {
+            setInterval(() => {
+                if (ultimaActualizacion) {
+                    const ahora = new Date();
+                    const diferencia = Math.floor((ahora - ultimaActualizacion) / 1000);
+                    const minutos = Math.floor(diferencia / 60);
+                    const segundos = diferencia % 60;
+                    
+                    let texto = '';
+                    if (minutos > 0) {
+                        texto = `Hace ${minutos}m ${segundos}s`;
+                    } else {
+                        texto = `Hace ${segundos}s`;
+                    }
+                    
+                    document.getElementById('tiempoTranscurrido').textContent = texto;
+                }
+            }, 1000);
+        }
+
         function actualizarEstadoConexion(texto, tipo = 'info') {
+            const container = document.getElementById('estadoConexionContainer');
             const elemento = document.getElementById('estadoConexion');
+            
             if (elemento) {
                 elemento.textContent = texto;
-                elemento.style.color = tipo === 'success' ? '#059669' : tipo === 'error' ? '#dc2626' : '#6b7280';
+                
+                // Actualizar clase del contenedor
+                container.className = `status-connection status-${tipo}`;
+            }
+        }
+
+        function actualizarMetodoConexion(metodo) {
+            const elemento = document.getElementById('metodoConexion');
+            if (elemento) {
+                elemento.textContent = metodo;
             }
         }
 
@@ -1049,31 +1342,9 @@
             if (ultimaActualizacion) {
                 const elemento = document.getElementById('ultimaActualizacion');
                 if (elemento) {
-                    elemento.textContent = `📅 Última actualización: ${ultimaActualizacion.toLocaleString('es-CL')}`;
+                    elemento.textContent = `📊 Última actualización: ${ultimaActualizacion.toLocaleString('es-CL')}`;
                 }
             }
-        }
-
-        function iniciarContadorProximaActualizacion() {
-            let segundosRestantes = 120;
-            const actualizarContador = () => {
-                if (segundosRestantes > 0) {
-                    const minutos = Math.floor(segundosRestantes / 60);
-                    const segundos = segundosRestantes % 60;
-                    actualizarProximaActualizacion(`Próxima actualización en: ${minutos}:${segundos.toString().padStart(2, '0')}`);
-                    segundosRestantes--;
-                } else {
-                    segundosRestantes = 120;
-                }
-            };
-            actualizarContador();
-            const contadorInterval = setInterval(() => {
-                if (!document.getElementById('autoRefresh').checked) {
-                    clearInterval(contadorInterval);
-                    return;
-                }
-                actualizarContador();
-            }, 1000);
         }
 
         function actualizarProximaActualizacion(texto) {
@@ -1083,14 +1354,35 @@
             }
         }
 
+        // FUNCIONES DE RESPALDO
+        async function simularCargaDatos() {
+            console.log('🔄 Cargando datos de ejemplo...');
+            
+            datosCompletos = [
+                ['2025-10-28 14:30:22', '25610', '20', 'YR', 'PAGADO', 'Transferencia', 'https://drive.google.com/file/d/example1', '', '', 'YRT', '25610', 'NV', 'YR', 'AM', '2025-10-28 14:45:01', 'Productos de limpieza hogar', '2025-10-28 14:45:01', 'Doc', 'https://drive.google.com/file/d/example2', 'https://drive.google.com/file/d/example3', '', '', '', '', '', '', '', '', 'AM', 'Cliente Martinez', 'https://drive.google.com/file/d/example4', '', '', '2025-10-28', ''],
+                ['2025-10-28 13:15:33', '25605', '19', 'YR', 'PAGADO', 'Efectivo', 'https://drive.google.com/file/d/example5', '', '', 'YRT', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Lopez familia', 'Envío', 'STARKEN', '1', '2025-10-28 10:00:00', '']
+            ];
+
+            encabezados = ['FECHA', 'Numero NV', 'Turno NV', 'Vendedor NV', 'Status NV', 'Observaciones NV', 'Foto NV 1 Link', 'Foto NV 2 Link', 'Foto NV 3 Link', 'Usuario', 'Numero NV 2', 'Origen', 'Vendedor', 'Ejecutor', 'FECHA', 'Descripción', 'Fecha Verif', 'Doc PPAL', 'Foto 1', 'Foto 2', 'Foto 3', 'Foto 4', 'Foto 5', 'Foto 6', 'Foto 7', 'Foto 8', 'Foto 9', 'Foto 10', 'ENTREGADO POR', 'RECIBIDO POR', 'FOTO 1 ENTREGA', 'FOTO 2 ENT', 'FOTO 3 ENT', 'ENTREGADO EL', 'ARMADO POR', 'CLIENTE', 'TIPO DE ENVIO', 'COURRIER', 'BULTOS', 'FECHA', 'Reporte Impreso'];
+
+            ultimaActualizacion = new Date();
+            metodoConexionActual = 'Datos de ejemplo';
+            
+            actualizarUltimaActualizacion();
+            actualizarEstadoConexion('⚠️ Datos de ejemplo', 'warning');
+            actualizarMetodoConexion('Datos de ejemplo (configura acceso público)');
+            
+            mostrarNotificacion('⚠️ Usando datos de ejemplo. Configura acceso público en Google Sheets.');
+            ocultarCargando();
+        }
+
+        // FUNCIONES DE UI (sin cambios significativos)
         function mostrarNotificacionSilenciosa(mensaje) {
             console.log(`🔔 ${mensaje}`);
             const estadoOriginal = document.getElementById('estadoConexion').textContent;
             document.getElementById('estadoConexion').textContent = mensaje;
-            document.getElementById('estadoConexion').style.color = '#0891b2';
             setTimeout(() => {
                 document.getElementById('estadoConexion').textContent = estadoOriginal;
-                document.getElementById('estadoConexion').style.color = '#059669';
             }, 3000);
         }
 
@@ -1135,12 +1427,12 @@
         }
 
         function mostrarCargando() {
-            document.getElementById('resultados').innerHTML = `<div class="loading"><div class="spinner"></div><p style="margin-top: 15px;">Cargando datos...</p></div>`;
+            document.getElementById('resultados').innerHTML = `<div class="loading"><div class="spinner"></div><p style="margin-top: 15px;">⚡ Conectando...</p></div>`;
         }
 
         function ocultarCargando() {
             const resultados = document.getElementById('resultados');
-            if (resultados.innerHTML.includes('Cargando datos...')) {
+            if (resultados.innerHTML.includes('Conectando...')) {
                 resultados.innerHTML = '';
             }
         }
@@ -1153,8 +1445,18 @@
             document.getElementById('resultados').innerHTML = `<div class="result-container"><h3>ℹ️ Información</h3><p>${mensaje}</p></div>`;
         }
 
+        // Agregar estilos de animación
         const style = document.createElement('style');
-        style.textContent = `@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } } @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }`;
+        style.textContent = `
+            @keyframes slideIn { 
+                from { transform: translateX(100%); opacity: 0; } 
+                to { transform: translateX(0); opacity: 1; } 
+            } 
+            @keyframes slideOut { 
+                from { transform: translateX(0); opacity: 1; } 
+                to { transform: translateX(100%); opacity: 0; } 
+            }
+        `;
         document.head.appendChild(style);
     </script>
 </body>
