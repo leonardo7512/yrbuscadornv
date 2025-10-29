@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔍 Buscador NV - Vendedor YR (Optimizado)</title>
+    <title>🔍 Buscador NV - Vendedor YR (FINAL)</title>
     <style>
         * {
             margin: 0;
@@ -111,10 +111,6 @@
         .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-        }
-
-        .btn:active {
-            transform: translateY(0);
         }
 
         .result-container {
@@ -246,16 +242,11 @@
             background: #e0f2fe;
             border-radius: 6px;
             border: 1px solid #0891b2;
+            cursor: pointer;
         }
 
-        .foto-item a {
-            color: #0891b2;
-            text-decoration: none;
-            font-weight: bold;
-        }
-
-        .foto-item a:hover {
-            text-decoration: underline;
+        .foto-item:hover {
+            background: #bae6fd;
         }
 
         .status-connection {
@@ -309,7 +300,7 @@
         </div>
 
         <div class="content">
-            <!-- Estado de conexión mejorado -->
+            <!-- Estado de conexión -->
             <div id="estadoConexionContainer" class="status-connection status-info">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
                     <div>
@@ -324,7 +315,6 @@
                         </button>
                     </div>
                 </div>
-                <div id="proximaActualizacion" style="font-size: 0.8em; margin-top: 8px;"></div>
             </div>
 
             <div class="search-section">
@@ -370,12 +360,11 @@
         // Configuración del vendedor YR
         const VENDEDOR = 'YR';
         
-        // URLs de conexión optimizadas (ordenadas por velocidad)
+        // URLs de conexión optimizadas
         const URLS_CONEXION = {
             json_directo: 'https://docs.google.com/spreadsheets/d/115hygvTHMNtF0KuQ3AcUgbhjA-WO1Nga3Kjra4wBZX0/gviz/tq?tqx=out:json&sheet=Registros&headers=1',
             csv_directo: 'https://docs.google.com/spreadsheets/d/115hygvTHMNtF0KuQ3AcUgbhjA-WO1Nga3Kjra4wBZX0/export?format=csv&gid=0',
-            proxy_allorigins: 'https://api.allorigins.win/raw?url=',
-            proxy_cors: 'https://cors-anywhere.herokuapp.com/'
+            proxy_allorigins: 'https://api.allorigins.win/raw?url='
         };
 
         // Variables globales
@@ -385,7 +374,7 @@
         let intervalRefresh = null;
         let datosOriginales = '';
         let metodoConexionActual = '';
-        let timeoutConexion = 8000; // 8 segundos timeout
+        let timeoutConexion = 8000;
         let inicioConexion = null;
 
         // Cargar datos al inicio
@@ -402,37 +391,26 @@
 
         async function inicializarSistema() {
             actualizarEstadoConexion('🚀 Iniciando sistema...', 'info');
-            
-            // Activar auto-refresh por defecto
             document.getElementById('autoRefresh').checked = true;
-            
-            // Cargar datos inicial
             await cargarDatosOptimizado(true);
-            
-            // Iniciar auto-refresh
             toggleAutoRefresh();
-            
-            // Iniciar contador de tiempo
             iniciarContadorTiempo();
         }
 
-        // SISTEMA DE CARGA OPTIMIZADO - CONEXIONES EN PARALELO
+        // SISTEMA DE CARGA OPTIMIZADO
         async function cargarDatosOptimizado(mostrarNotif = true) {
             try {
                 inicioConexion = Date.now();
                 if (mostrarNotif) mostrarCargando();
                 
-                actualizarEstadoConexion('⚡ Conectando en paralelo...', 'info');
-                console.log('📊 Iniciando conexión optimizada...');
+                actualizarEstadoConexion('⚡ Conectando...', 'info');
                 
-                // Intentar múltiples métodos EN PARALELO
                 const promesasConexion = [
                     intentarJSONPRapido(),
                     intentarCSVDirecto(),
                     intentarConProxy()
                 ];
                 
-                // Usar Promise.race para obtener el primer resultado exitoso
                 const resultado = await Promise.race(promesasConexion);
                 
                 if (resultado.exito) {
@@ -446,13 +424,12 @@
                 actualizarEstadoConexion('❌ Sin conexión', 'error');
                 
                 if (mostrarNotif) {
-                    mostrarError('No se pudieron cargar los datos. Usando datos de ejemplo.');
-                    await simularCargaDatos();
+                    mostrarError('No se pudieron cargar los datos.');
                 }
             }
         }
 
-        // MÉTODO 1: JSONP OPTIMIZADO
+        // MÉTODO JSONP OPTIMIZADO
         async function intentarJSONPRapido() {
             return new Promise((resolve, reject) => {
                 const timeoutId = setTimeout(() => {
@@ -493,7 +470,7 @@
                             
                             resolve({
                                 exito: true,
-                                metodo: `JSONP directo (${tiempoConexion}ms)`,
+                                metodo: `JSONP (${tiempoConexion}ms)`,
                                 hayNuevosDatos: true
                             });
                         } else {
@@ -516,7 +493,7 @@
             });
         }
 
-        // MÉTODO 2: CSV DIRECTO OPTIMIZADO
+        // MÉTODO CSV DIRECTO
         async function intentarCSVDirecto() {
             try {
                 const controller = new AbortController();
@@ -554,7 +531,7 @@
             }
         }
 
-        // MÉTODO 3: CON PROXY (RESPALDO)
+        // MÉTODO CON PROXY
         async function intentarConProxy() {
             try {
                 const controller = new AbortController();
@@ -638,6 +615,98 @@
             return resultado;
         }
 
+        // DETECTAR FOTOS SIMPLIFICADO - SEGÚN GOOGLE SHEETS REAL
+        function detectarFotos(data) {
+            const fotos = [];
+            
+            // Mapeo según las imágenes reales del Google Sheets
+            const columnasFotos = [
+                // CREACIÓN (G=6, H=7, I=8)
+                { indice: 6, nombre: 'FNV 1', fase: 'creacion' },
+                { indice: 7, nombre: 'Foto NV1', fase: 'creacion' },
+                { indice: 8, nombre: 'Foto NV2', fase: 'creacion' },
+                
+                // PROCESO (S=18, T=19, U=20, V=21, W=22, X=23, Y=24, Z=25, AA=26, AB=27)
+                { indice: 17, nombre: 'Doc', fase: 'proceso' },
+                { indice: 18, nombre: 'F1', fase: 'proceso' },
+                { indice: 19, nombre: 'F2', fase: 'proceso' },
+                { indice: 20, nombre: 'F3', fase: 'proceso' },
+                { indice: 21, nombre: 'F4', fase: 'proceso' },
+                { indice: 22, nombre: 'F5', fase: 'proceso' },
+                { indice: 23, nombre: 'F6', fase: 'proceso' },
+                { indice: 24, nombre: 'F7', fase: 'proceso' },
+                { indice: 25, nombre: 'F8', fase: 'proceso' },
+                { indice: 26, nombre: 'F9', fase: 'proceso' },
+                { indice: 27, nombre: 'F10', fase: 'proceso' },
+                
+                // ENTREGA (AE=30, AF=31, AG=32)
+                { indice: 30, nombre: 'Foto Ent 1', fase: 'entrega' },
+                { indice: 31, nombre: 'Foto Ent 2', fase: 'entrega' },
+                { indice: 32, nombre: 'Foto Ent 3', fase: 'entrega' }
+            ];
+            
+            columnasFotos.forEach(col => {
+                const valor = data[col.indice];
+                if (valor && valor.toString().trim() !== '' && 
+                    valor.toString().trim() !== 'nan' && 
+                    valor.toString().trim() !== 'undefined') {
+                    
+                    const valorLimpio = valor.toString().trim();
+                    
+                    // Si tiene contenido, lo agregamos
+                    if (valorLimpio.length > 0) {
+                        fotos.push({
+                            nombre: col.nombre,
+                            texto: valorLimpio,
+                            fase: col.fase
+                        });
+                    }
+                }
+            });
+            
+            return fotos;
+        }
+
+        // GENERAR GALERÍA DE FOTOS SIMPLIFICADA
+        function generarGaleriaFotos(fotos) {
+            if (fotos.length === 0) return '';
+            
+            let html = `
+                <div class="foto-gallery">
+                    <h4>📸 Fotos y Documentos (${fotos.length} disponibles)</h4>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
+            `;
+            
+            fotos.forEach((foto, index) => {
+                const icono = foto.fase === 'creacion' ? '📋' : 
+                           foto.fase === 'proceso' ? '🔧' : '📦';
+                
+                html += `
+                    <div class="foto-item" onclick="mostrarInfoFoto('${foto.texto}', '${foto.nombre}')">
+                        <span>${icono}</span>
+                        <span style="color: #0891b2; font-weight: bold;">
+                            ${foto.texto}
+                        </span>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                    <div style="margin-top: 10px; padding: 10px; background: #f0f9ff; border-radius: 6px; font-size: 0.9em; color: #0369a1;">
+                        💡 <strong>Nota:</strong> Los enlaces de fotos funcionan desde Google Sheets. 
+                        Aquí se muestra el texto del campo.
+                    </div>
+                </div>
+            `;
+            
+            return html;
+        }
+
+        function mostrarInfoFoto(texto, nombre) {
+            alert(`📷 ${nombre}\n\nTexto: ${texto}\n\n💡 Para ver la foto, accede desde Google Sheets directamente.`);
+        }
+
         // FINALIZAR CARGA OPTIMIZADA
         function finalizarCargaDatos(metodo, mostrarNotif = true, hayNuevosDatos = false) {
             const misRegistros = datosCompletos.filter(row => {
@@ -667,7 +736,7 @@
             }
         }
 
-        // FUNCIONES DE BÚSQUEDA (MEJORADAS)
+        // FUNCIONES DE BÚSQUEDA
         function buscarNotaVenta() {
             const numeroNV = document.getElementById('numeroNV').value.trim();
             
@@ -705,7 +774,7 @@
             return { encontrada: false };
         }
 
-        // MOSTRAR RESULTADO MEJORADO CON FECHAS Y FOTOS
+        // MOSTRAR RESULTADO MEJORADO
         function mostrarResultadoMejorado(resultado) {
             const data = resultado.data;
             const numeroNV = data[1] || 'Sin número';
@@ -716,12 +785,10 @@
             const fechaProgramada = formatearFechaHora(data[39]);
             const fechaEntrega = formatearFechaHora(data[33]);
             
-            // Lógica de fases - ÍNDICES DEFINITIVAMENTE CORREGIDOS
+            // Lógica de fases
             const tieneEjecutor = data[13] && data[13].toString().trim() !== '';
             const tieneArmado = data[34] && data[34].toString().trim() !== '';
-            // CORRECCIÓN FINAL: Según Excel real, TIPO DE ENVIO está en columna 36
             const despachoDefinido = data[36] && data[36].toString().trim() !== '';
-            // CORRECCIÓN: Entregado por está en posición 28 según Excel real  
             const entregaConfirmada = data[28] && data[28].toString().trim() !== '';
             
             // Detectar fotos
@@ -846,7 +913,7 @@
             document.getElementById('resultados').innerHTML = html;
         }
 
-        // FUNCIÓN PARA FORMATEAR FECHA Y HORA MEJORADA
+        // FUNCIÓN PARA FORMATEAR FECHA Y HORA
         function formatearFechaHora(fechaStr) {
             if (!fechaStr || fechaStr.toString().trim() === '') {
                 return 'No especificada';
@@ -854,32 +921,23 @@
             
             const fecha = fechaStr.toString().trim();
             
-            // Detectar si tiene hora (contiene :)
             if (fecha.includes(':')) {
-                // Tiene hora completa
                 try {
                     const fechaObj = new Date(fecha);
                     if (!isNaN(fechaObj.getTime())) {
                         return `📅 ${fechaObj.toLocaleDateString('es-CL')} ⏰ ${fechaObj.toLocaleTimeString('es-CL')}`;
                     }
                 } catch (e) {
-                    // Si falla el parsing, devolver tal como está
+                    // Si falla, devolver tal como está
                 }
                 return `📅 ${fecha}`;
             } else {
-                // Solo fecha
                 return `📅 ${fecha}`;
             }
         }
 
-        // FUNCIÓN PARA GENERAR INFO DE DESPACHO INTELIGENTE - ÍNDICES DEFINITIVOS
+        // FUNCIÓN PARA GENERAR INFO DE DESPACHO
         function generarInfoDespacho(data, fechaProgramada, fechaEntrega, entregaConfirmada) {
-            // CORRECCIÓN FINAL: Según Excel real
-            // data[36] = TIPO DE ENVIO ("Retiro")  
-            // data[37] = CURRIER (cuando aplica)
-            // data[38] = BULTOS
-            // data[39] = FECHA.2 (programada)
-            
             const tipoDespacho = data[36] ? data[36].toString().toUpperCase() : '';
             const courier = data[37] && data[37].toString().trim() !== '' && data[37].toString().trim() !== 'nan' ? data[37] : null;
             const bultos = data[38] && data[38].toString().trim() !== 'nan' ? data[38] : 'No especificado';
@@ -887,7 +945,6 @@
             
             let html = '<div class="info-grid">';
             
-            // Tipo de despacho
             html += `
                 <div class="info-item">
                     <div class="info-label">${tipoDespacho === 'RETIRO' ? '🏪' : '🚚'} Tipo de Despacho</div>
@@ -895,7 +952,6 @@
                 </div>
             `;
             
-            // Courier - solo si aplica
             if (tipoDespacho === 'ENVÍO' || tipoDespacho === 'ENVIO') {
                 html += `
                     <div class="info-item">
@@ -912,7 +968,6 @@
                 `;
             }
             
-            // Bultos y fecha
             html += `
                 <div class="info-item">
                     <div class="info-label">📊 Bultos</div>
@@ -926,7 +981,6 @@
             
             html += '</div>';
             
-            // Información de entrega si está confirmada
             if (entregaConfirmada) {
                 html += `
                     <h5 style="margin-top: 20px; margin-bottom: 10px; border-top: 1px solid #eee; padding-top: 15px;">✅ Confirmación de Entrega</h5>
@@ -956,114 +1010,6 @@
             return html;
         }
 
-        // DETECTAR FOTOS SIMPLIFICADO - PARA HIPERVÍNCULOS DE EXCEL
-        function detectarFotos(data) {
-            const fotos = [];
-            
-            // Mapeo exacto según la estructura real del Excel
-            const columnasFotos = [
-                // FASE CREACIÓN (Columnas 6, 7, 8)
-                { indice: 6, nombre: 'Foto NV 1', fase: 'creacion' },
-                { indice: 7, nombre: 'Foto NV 2', fase: 'creacion' },
-                { indice: 8, nombre: 'Foto NV 3', fase: 'creacion' },
-                
-                // FASE PROCESAMIENTO (Columnas 17-27)
-                { indice: 17, nombre: 'Doc Principal', fase: 'proceso' },
-                { indice: 18, nombre: 'Foto Proceso 1', fase: 'proceso' },
-                { indice: 19, nombre: 'Foto Proceso 2', fase: 'proceso' },
-                { indice: 20, nombre: 'Foto Proceso 3', fase: 'proceso' },
-                { indice: 21, nombre: 'Foto Proceso 4', fase: 'proceso' },
-                { indice: 22, nombre: 'Foto Proceso 5', fase: 'proceso' },
-                { indice: 23, nombre: 'Foto Proceso 6', fase: 'proceso' },
-                { indice: 24, nombre: 'Foto Proceso 7', fase: 'proceso' },
-                { indice: 25, nombre: 'Foto Proceso 8', fase: 'proceso' },
-                { indice: 26, nombre: 'Foto Proceso 9', fase: 'proceso' },
-                { indice: 27, nombre: 'Foto Proceso 10', fase: 'proceso' },
-                
-                // FASE ENTREGA (Columnas 30, 31, 32)
-                { indice: 30, nombre: 'Foto Entrega 1', fase: 'entrega' },
-                { indice: 31, nombre: 'Foto Entrega 2', fase: 'entrega' },
-                { indice: 32, nombre: 'Foto Entrega 3', fase: 'entrega' }
-            ];
-            
-            columnasFotos.forEach(col => {
-                const valor = data[col.indice];
-                if (valor && valor.toString().trim() !== '' && valor.toString().trim() !== 'nan') {
-                    const valorLimpio = valor.toString().trim();
-                    
-                    // SIMPLIFICADO: Si tiene contenido, lo mostramos como enlace
-                    // Esto funciona tanto para URLs como para texto de hipervínculos
-                    if (valorLimpio.length > 2 && !valorLimpio.includes('undefined')) {
-                        fotos.push({
-                            nombre: col.nombre,
-                            texto: valorLimpio, // El texto que aparece en Excel
-                            fase: col.fase
-                        });
-                    }
-                }
-            });
-            
-            return fotos;
-        }
-
-        // GENERAR GALERÍA DE FOTOS SIMPLIFICADA
-        function generarGaleriaFotos(fotos) {
-            if (fotos.length === 0) return '';
-            
-            let html = `
-                <div class="foto-gallery">
-                    <h4>📸 Fotos y Documentos (${fotos.length} disponibles)</h4>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
-            `;
-            
-            fotos.forEach((foto, index) => {
-                const icono = foto.fase === 'creacion' ? '📋' : 
-                           foto.fase === 'proceso' ? '🔧' : '📦';
-                
-                html += `
-                    <div class="foto-item">
-                        <span>${icono}</span>
-                        <span style="color: #0891b2; cursor: pointer; text-decoration: underline;" 
-                              onclick="alert('${foto.texto}\\n\\nEste enlace debe abrirse desde Excel.')" 
-                              title="Click para ver información del enlace">
-                            ${foto.texto}
-                        </span>
-                    </div>
-                `;
-            });
-            
-            html += `
-                    </div>
-                    <div style="margin-top: 10px; padding: 10px; background: #f0f9ff; border-radius: 6px; font-size: 0.9em; color: #0369a1;">
-                        💡 <strong>Nota:</strong> Los enlaces de fotos funcionan desde Excel. 
-                        Aquí se muestra el texto del hipervínculo.
-                    </div>
-                </div>
-            `;
-            
-            return html;
-        }
-
-        // FUNCIÓN PARA DESCARGAR FOTOS
-        function descargarFoto(url, nombre) {
-            try {
-                // Crear enlace temporal para descarga
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = nombre || 'foto';
-                link.target = '_blank';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                mostrarNotificacion(`📷 Abriendo ${nombre} para descarga`);
-            } catch (error) {
-                console.error('Error al descargar foto:', error);
-                mostrarError('No se pudo abrir la foto. Verifica los permisos del archivo.');
-            }
-        }
-
-        // RESTO DE FUNCIONES DE BÚSQUEDA (sin cambios en lógica)
         function buscarTodasMisNV() {
             const misNV = datosCompletos.filter(row => {
                 const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
@@ -1082,7 +1028,6 @@
             const misNV = datosCompletos.filter(row => {
                 const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
                 const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
-                // FINAL: Según Excel real, TIPO DE ENVIO está en columna 36
                 const despachoDefinido = row[36] && row[36].toString().trim() !== '';
                 
                 return (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) && !despachoDefinido;
@@ -1099,7 +1044,6 @@
             const misNV = datosCompletos.filter(row => {
                 const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
                 const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
-                // FINAL: Según Excel real, TIPO DE ENVIO está en columna 36
                 const despachoDefinido = row[36] && row[36].toString().trim() !== '';
                 
                 return (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) && despachoDefinido;
@@ -1121,10 +1065,9 @@
 
             nvList.forEach((nv, index) => {
                 const numeroNV = nv[1] || 'Sin número';
-                const cliente = nv[35] || 'Sin cliente'; // Cliente está en posición 35
+                const cliente = nv[35] || 'Sin cliente';
                 const status = nv[4] || 'Sin status';
                 const fecha = formatearFechaHora(nv[0]);
-                // CORRECCIÓN FINAL: TIPO DE ENVIO está en posición 36 según Excel real
                 const despachoDefinido = nv[36] && nv[36].toString().trim() !== '';
 
                 html += `
@@ -1158,7 +1101,7 @@
             buscarNotaVenta();
         }
 
-        // FUNCIONES DE EXPORTACIÓN (sin cambios)
+        // FUNCIONES DE EXPORTACIÓN
         function exportarInformeRapido(numeroNV) {
             const resultado = buscarNVenDatos(numeroNV);
             if (!resultado.encontrada) return;
@@ -1272,7 +1215,7 @@
             copiarAlPortapapeles(informe);
         }
 
-        // FUNCIONES DE SISTEMA (OPTIMIZADAS)
+        // FUNCIONES DE SISTEMA
         async function actualizarAhora() {
             const btn = document.getElementById('btnActualizar');
             const originalText = btn.innerHTML;
@@ -1299,12 +1242,10 @@
                 intervalRefresh = setInterval(async () => {
                     console.log('🔄 Auto-refresh ejecutándose...');
                     await cargarDatosOptimizado(false);
-                }, 90000); // 90 segundos
+                }, 90000);
                 
-                actualizarProximaActualizacion('Auto-refresh activo cada 90 segundos');
                 console.log('✅ Auto-refresh activado (cada 90 segundos)');
             } else {
-                actualizarProximaActualizacion('Auto-refresh desactivado');
                 console.log('❌ Auto-refresh desactivado');
             }
         }
@@ -1335,8 +1276,6 @@
             
             if (elemento) {
                 elemento.textContent = texto;
-                
-                // Actualizar clase del contenedor
                 container.className = `status-connection status-${tipo}`;
             }
         }
@@ -1357,36 +1296,6 @@
             }
         }
 
-        function actualizarProximaActualizacion(texto) {
-            const elemento = document.getElementById('proximaActualizacion');
-            if (elemento) {
-                elemento.textContent = texto;
-            }
-        }
-
-        // FUNCIONES DE RESPALDO
-        async function simularCargaDatos() {
-            console.log('🔄 Cargando datos de ejemplo...');
-            
-            datosCompletos = [
-                ['2025-10-28 14:30:22', '25610', '20', 'YR', 'PAGADO', 'Transferencia', 'https://drive.google.com/file/d/example1', '', '', 'YRT', '25610', 'NV', 'YR', 'AM', '2025-10-28 14:45:01', 'Productos de limpieza hogar', '2025-10-28 14:45:01', 'Doc', 'https://drive.google.com/file/d/example2', 'https://drive.google.com/file/d/example3', '', '', '', '', '', '', '', '', 'AM', 'Cliente Martinez', 'https://drive.google.com/file/d/example4', '', '', '2025-10-28', ''],
-                ['2025-10-28 13:15:33', '25605', '19', 'YR', 'PAGADO', 'Efectivo', 'https://drive.google.com/file/d/example5', '', '', 'YRT', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Lopez familia', 'Envío', 'STARKEN', '1', '2025-10-28 10:00:00', '']
-            ];
-
-            encabezados = ['FECHA', 'Numero NV', 'Turno NV', 'Vendedor NV', 'Status NV', 'Observaciones NV', 'Foto NV 1 Link', 'Foto NV 2 Link', 'Foto NV 3 Link', 'Usuario', 'Numero NV 2', 'Origen', 'Vendedor', 'Ejecutor', 'FECHA', 'Descripción', 'Fecha Verif', 'Doc PPAL', 'Foto 1', 'Foto 2', 'Foto 3', 'Foto 4', 'Foto 5', 'Foto 6', 'Foto 7', 'Foto 8', 'Foto 9', 'Foto 10', 'ENTREGADO POR', 'RECIBIDO POR', 'FOTO 1 ENTREGA', 'FOTO 2 ENT', 'FOTO 3 ENT', 'ENTREGADO EL', 'ARMADO POR', 'CLIENTE', 'TIPO DE ENVIO', 'COURRIER', 'BULTOS', 'FECHA', 'Reporte Impreso'];
-
-            ultimaActualizacion = new Date();
-            metodoConexionActual = 'Datos de ejemplo';
-            
-            actualizarUltimaActualizacion();
-            actualizarEstadoConexion('⚠️ Datos de ejemplo', 'warning');
-            actualizarMetodoConexion('Datos de ejemplo (configura acceso público)');
-            
-            mostrarNotificacion('⚠️ Usando datos de ejemplo. Configura acceso público en Google Sheets.');
-            ocultarCargando();
-        }
-
-        // FUNCIONES DE UI (sin cambios significativos)
         function mostrarNotificacionSilenciosa(mensaje) {
             console.log(`🔔 ${mensaje}`);
             const estadoOriginal = document.getElementById('estadoConexion').textContent;
