@@ -956,7 +956,7 @@
             return html;
         }
 
-        // DETECTAR Y ORGANIZAR FOTOS - VERSIÓN FINAL CORREGIDA
+        // DETECTAR FOTOS SIMPLIFICADO - PARA HIPERVÍNCULOS DE EXCEL
         function detectarFotos(data) {
             const fotos = [];
             
@@ -991,28 +991,12 @@
                 if (valor && valor.toString().trim() !== '' && valor.toString().trim() !== 'nan') {
                     const valorLimpio = valor.toString().trim();
                     
-                    // FILTRO MEJORADO: Solo URLs reales, no marcadores
-                    const esURLReal = (
-                        valorLimpio.includes('http') || 
-                        valorLimpio.includes('drive.google.com') ||
-                        valorLimpio.includes('dropbox.com') ||
-                        valorLimpio.includes('onedrive.com')
-                    );
-                    
-                    // EXCLUIR marcadores comunes que NO son URLs
-                    const esMarcador = (
-                        valorLimpio === 'F1' || valorLimpio === 'F2' || valorLimpio === 'F3' || 
-                        valorLimpio === 'F4' || valorLimpio === 'F5' || valorLimpio === 'F6' ||
-                        valorLimpio === 'Doc' || valorLimpio === 'Foto NV1' || 
-                        valorLimpio === 'Foto NV2' || valorLimpio === 'Foto NV3' ||
-                        valorLimpio.length < 10 // URLs reales son más largas
-                    );
-                    
-                    // Solo agregar si es una URL real, no un marcador
-                    if (esURLReal && !esMarcador) {
+                    // SIMPLIFICADO: Si tiene contenido, lo mostramos como enlace
+                    // Esto funciona tanto para URLs como para texto de hipervínculos
+                    if (valorLimpio.length > 2 && !valorLimpio.includes('undefined')) {
                         fotos.push({
                             nombre: col.nombre,
-                            url: valorLimpio,
+                            texto: valorLimpio, // El texto que aparece en Excel
                             fase: col.fase
                         });
                     }
@@ -1022,55 +1006,41 @@
             return fotos;
         }
 
-        // GENERAR GALERÍA DE FOTOS
+        // GENERAR GALERÍA DE FOTOS SIMPLIFICADA
         function generarGaleriaFotos(fotos) {
-            const fotosPorFase = {
-                creacion: fotos.filter(f => f.fase === 'creacion'),
-                proceso: fotos.filter(f => f.fase === 'proceso'),
-                entrega: fotos.filter(f => f.fase === 'entrega')
-            };
+            if (fotos.length === 0) return '';
             
             let html = `
                 <div class="foto-gallery">
-                    <h4>📸 Galería de Fotos (${fotos.length} encontradas)</h4>
+                    <h4>📸 Fotos y Documentos (${fotos.length} disponibles)</h4>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
             `;
             
-            Object.entries(fotosPorFase).forEach(([fase, fotosFase]) => {
-                if (fotosFase.length > 0) {
-                    const faseNombre = {
-                        creacion: '📋 Creación',
-                        proceso: '🔧 Proceso',
-                        entrega: '📦 Entrega'
-                    };
-                    
-                    html += `
-                        <h5 style="margin-top: 15px; margin-bottom: 8px;">${faseNombre[fase]} (${fotosFase.length})</h5>
-                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                    `;
-                    
-                    fotosFase.forEach((foto, index) => {
-                        const esGoogleDrive = foto.url.includes('drive.google.com');
-                        const urlVisualizacion = esGoogleDrive ? 
-                            foto.url.replace('/file/d/', '/uc?id=').replace('/view', '').replace('?usp=sharing', '') :
-                            foto.url;
-                        
-                        html += `
-                            <div class="foto-item">
-                                <a href="${urlVisualizacion}" target="_blank" title="Ver ${foto.nombre}">
-                                    📷 ${foto.nombre}
-                                </a>
-                                <button onclick="descargarFoto('${urlVisualizacion}', '${foto.nombre}')" 
-                                        style="margin-left: 8px; border: none; background: none; cursor: pointer; color: #0891b2;" 
-                                        title="Descargar">⬇️</button>
-                            </div>
-                        `;
-                    });
-                    
-                    html += '</div>';
-                }
+            fotos.forEach((foto, index) => {
+                const icono = foto.fase === 'creacion' ? '📋' : 
+                           foto.fase === 'proceso' ? '🔧' : '📦';
+                
+                html += `
+                    <div class="foto-item">
+                        <span>${icono}</span>
+                        <span style="color: #0891b2; cursor: pointer; text-decoration: underline;" 
+                              onclick="alert('${foto.texto}\\n\\nEste enlace debe abrirse desde Excel.')" 
+                              title="Click para ver información del enlace">
+                            ${foto.texto}
+                        </span>
+                    </div>
+                `;
             });
             
-            html += '</div>';
+            html += `
+                    </div>
+                    <div style="margin-top: 10px; padding: 10px; background: #f0f9ff; border-radius: 6px; font-size: 0.9em; color: #0369a1;">
+                        💡 <strong>Nota:</strong> Los enlaces de fotos funcionan desde Excel. 
+                        Aquí se muestra el texto del hipervínculo.
+                    </div>
+                </div>
+            `;
+            
             return html;
         }
 
