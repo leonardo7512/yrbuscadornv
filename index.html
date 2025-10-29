@@ -716,10 +716,12 @@
             const fechaProgramada = formatearFechaHora(data[39]);
             const fechaEntrega = formatearFechaHora(data[33]);
             
-            // Lógica de fases
+            // Lógica de fases - ÍNDICES CORREGIDOS
             const tieneEjecutor = data[13] && data[13].toString().trim() !== '';
             const tieneArmado = data[34] && data[34].toString().trim() !== '';
-            const despachoDefinido = data[36] && data[36].toString().trim() !== '';
+            // CORRECCIÓN: Tipo de envío está en posición 37 según datos reales
+            const despachoDefinido = data[37] && data[37].toString().trim() !== '';
+            // CORRECCIÓN: Entregado por está en posición 28 según datos reales  
             const entregaConfirmada = data[28] && data[28].toString().trim() !== '';
             
             // Detectar fotos
@@ -870,11 +872,18 @@
             }
         }
 
-        // FUNCIÓN PARA GENERAR INFO DE DESPACHO INTELIGENTE
+        // FUNCIÓN PARA GENERAR INFO DE DESPACHO INTELIGENTE - ÍNDICES CORREGIDOS
         function generarInfoDespacho(data, fechaProgramada, fechaEntrega, entregaConfirmada) {
-            const tipoDespacho = data[36] ? data[36].toString().toUpperCase() : '';
-            const courier = data[37] && data[37].toString().trim() !== '' ? data[37] : null;
-            const bultos = data[38] || 'No especificado';
+            // CORRECCIÓN: Según datos reales
+            // data[37] = TIPO DE ENVIO ("Retiro")  
+            // data[38] = COURRIER (cuando aplica)
+            // data[39] = BULTOS
+            // data[40] = FECHA (programada)
+            
+            const tipoDespacho = data[37] ? data[37].toString().toUpperCase() : '';
+            const courier = data[38] && data[38].toString().trim() !== '' ? data[38] : null;
+            const bultos = data[39] || 'No especificado';
+            const fechaProg = data[40] || fechaProgramada;
             
             let html = '<div class="info-grid">';
             
@@ -882,7 +891,7 @@
             html += `
                 <div class="info-item">
                     <div class="info-label">${tipoDespacho === 'RETIRO' ? '🏪' : '🚚'} Tipo de Despacho</div>
-                    <div class="info-value">${data[36]}</div>
+                    <div class="info-value">${data[37]}</div>
                 </div>
             `;
             
@@ -911,7 +920,7 @@
                 </div>
                 <div class="info-item">
                     <div class="info-label">📅 Fecha Programada</div>
-                    <div class="info-value">${fechaProgramada}</div>
+                    <div class="info-value">${formatearFechaHora(fechaProg)}</div>
                 </div>
             `;
             
@@ -947,15 +956,19 @@
             return html;
         }
 
-        // DETECTAR Y ORGANIZAR FOTOS
+        // DETECTAR Y ORGANIZAR FOTOS - MAPEO CORREGIDO
         function detectarFotos(data) {
             const fotos = [];
             
-            // Mapeo de columnas con fotos (ajustar según tu estructura)
+            // Mapeo correcto según la estructura real del Google Sheets
             const columnasFotos = [
+                // FASE CREACIÓN (Columnas G, H, I = índices 6, 7, 8)
                 { indice: 6, nombre: 'Foto NV 1', fase: 'creacion' },
                 { indice: 7, nombre: 'Foto NV 2', fase: 'creacion' },
                 { indice: 8, nombre: 'Foto NV 3', fase: 'creacion' },
+                
+                // FASE PROCESAMIENTO (Columnas R hasta AB = índices 17-27)
+                { indice: 17, nombre: 'Doc Principal', fase: 'proceso' },
                 { indice: 18, nombre: 'Foto Proceso 1', fase: 'proceso' },
                 { indice: 19, nombre: 'Foto Proceso 2', fase: 'proceso' },
                 { indice: 20, nombre: 'Foto Proceso 3', fase: 'proceso' },
@@ -966,6 +979,8 @@
                 { indice: 25, nombre: 'Foto Proceso 8', fase: 'proceso' },
                 { indice: 26, nombre: 'Foto Proceso 9', fase: 'proceso' },
                 { indice: 27, nombre: 'Foto Proceso 10', fase: 'proceso' },
+                
+                // FASE ENTREGA (Columnas AE, AF, AG = índices 30, 31, 32)
                 { indice: 30, nombre: 'Foto Entrega 1', fase: 'entrega' },
                 { indice: 31, nombre: 'Foto Entrega 2', fase: 'entrega' },
                 { indice: 32, nombre: 'Foto Entrega 3', fase: 'entrega' }
@@ -973,12 +988,16 @@
             
             columnasFotos.forEach(col => {
                 const url = data[col.indice];
-                if (url && url.toString().trim() !== '' && url.toString().includes('http')) {
-                    fotos.push({
-                        nombre: col.nombre,
-                        url: url.toString().trim(),
-                        fase: col.fase
-                    });
+                if (url && url.toString().trim() !== '' && url.toString().trim() !== '__') {
+                    const urlLimpia = url.toString().trim();
+                    // Verificar que sea una URL válida (no texto como "Doc", "F1", etc.)
+                    if (urlLimpia.includes('http') || urlLimpia.includes('drive.google.com')) {
+                        fotos.push({
+                            nombre: col.nombre,
+                            url: urlLimpia,
+                            fase: col.fase
+                        });
+                    }
                 }
             });
             
@@ -1075,7 +1094,8 @@
             const misNV = datosCompletos.filter(row => {
                 const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
                 const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
-                const despachoDefinido = row[36] && row[36].toString().trim() !== '';
+                // Basado en datos reales: TIPO DE ENVIO está en columna 37 (posición 37)
+                const despachoDefinido = row[37] && row[37].toString().trim() !== '';
                 
                 return (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) && !despachoDefinido;
             });
@@ -1091,7 +1111,8 @@
             const misNV = datosCompletos.filter(row => {
                 const vendedorNV = row[3] ? row[3].toString().toUpperCase() : '';
                 const vendedorProceso = row[12] ? row[12].toString().toUpperCase() : '';
-                const despachoDefinido = row[36] && row[36].toString().trim() !== '';
+                // Basado en datos reales: TIPO DE ENVIO está en columna 37 (posición 37)
+                const despachoDefinido = row[37] && row[37].toString().trim() !== '';
                 
                 return (vendedorNV === VENDEDOR || vendedorProceso === VENDEDOR) && despachoDefinido;
             });
@@ -1112,10 +1133,11 @@
 
             nvList.forEach((nv, index) => {
                 const numeroNV = nv[1] || 'Sin número';
-                const cliente = nv[35] || 'Sin cliente';
+                const cliente = nv[35] || 'Sin cliente'; // Cliente está en posición 35
                 const status = nv[4] || 'Sin status';
                 const fecha = formatearFechaHora(nv[0]);
-                const despachoDefinido = nv[36] && nv[36].toString().trim() !== '';
+                // CORRECCIÓN: Tipo de envío está en posición 37
+                const despachoDefinido = nv[37] && nv[37].toString().trim() !== '';
 
                 html += `
                     <div class="phase" style="margin-bottom: 10px; cursor: pointer;" onclick="verDetalleNV('${numeroNV}')">
@@ -1181,7 +1203,7 @@
             }
             
             if (despachoDefinido) {
-                informe += `3️⃣ DESPACHO: ✅ DEFINIDO (${data[36]})\n`;
+                informe += `3️⃣ DESPACHO: ✅ DEFINIDO (${data[37]})\n`;
                  if (entregaConfirmada) {
                     informe += `4️⃣ ENTREGA: ✅ COMPLETADA\n`;
                  } else {
@@ -1242,10 +1264,10 @@
             informe += `${'─'.repeat(25)}\n`;
             if (despachoDefinido) {
                 informe += `Estado Despacho: ✅ DEFINIDO\n`;
-                informe += `Tipo: ${data[36]}\n`;
-                if (data[37]) informe += `Courier: ${data[37]}\n`;
-                if (data[38]) informe += `Bultos: ${data[38]}\n`;
-                if (data[39]) informe += `Fecha programada: ${data[39]}\n\n`;
+                informe += `Tipo: ${data[37]}\n`;
+                if (data[38]) informe += `Courier: ${data[38]}\n`;
+                if (data[39]) informe += `Bultos: ${data[39]}\n`;
+                if (data[40]) informe += `Fecha programada: ${data[40]}\n\n`;
 
                 if (entregaConfirmada) {
                     informe += `Estado Entrega: ✅ COMPLETADA\n`;
