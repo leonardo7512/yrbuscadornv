@@ -982,7 +982,7 @@
         // MOSTRAR RESULTADO MEJORADO
         function mostrarResultadoMejorado(resultado) {
             const data = resultado.data;
-            const numeroNV = data[1] || 'Sin número';
+            const numeroNV = data[1] || data[10] || 'Sin número';
             
             // Detectar fechas con formato mejorado
             const fechaCreacion = formatearFechaHora(data[0]);
@@ -1270,7 +1270,7 @@
             `;
 
             nvList.forEach((nv, index) => {
-                const numeroNV = nv[1] || 'Sin número';
+                const numeroNV = nv[1] || nv[10] || 'Sin número';
                 const cliente = nv[35] || 'Sin cliente';
                 const status = nv[4] || 'Sin status';
                 const fecha = formatearFechaHora(nv[0]);
@@ -1682,16 +1682,35 @@ function logRenderPhotos(host, records) {
     if (!count) host.append(logElement('p', 'No hay fotos ni documentos disponibles en la respuesta de LOG para esta NV.', 'log-photo-message'));
 }
 
+const logPhotoCache = new Map();
+const logPhotoRequests = new Map();
+async function logFetchPhotos(nv) {
+    const key = String(nv).trim().toUpperCase();
+    const cached = logPhotoCache.get(key);
+    if (cached && Date.now() - cached.time < 60000) return cached.result;
+    if (logPhotoRequests.has(key)) return logPhotoRequests.get(key);
+    const request = (async () => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 25000);
+        try {
+            const response = await fetch(`${LOG_PHOTO_SERVICE}?nv=${encodeURIComponent(nv)}`, {signal:controller.signal,redirect:'follow'});
+            if (!response.ok) throw new Error('No se pudo consultar LOG.');
+            const result = await response.json();
+            if (!result.success) throw new Error(result.error || 'LOG no devolvió los archivos de esta NV.');
+            if (!Array.isArray(result.datos)) throw new Error('La respuesta de LOG no contiene una lista de archivos válida.');
+            logPhotoCache.set(key, {time:Date.now(),result});
+            if (logPhotoCache.size > 30) logPhotoCache.delete(logPhotoCache.keys().next().value);
+            return result;
+        } finally { clearTimeout(timeout); }
+    })().finally(() => logPhotoRequests.delete(key));
+    logPhotoRequests.set(key, request);
+    return request;
+}
+
 async function logLoadPhotos(host, nv, vendor) {
     host.replaceChildren(logElement('p', 'Cargando fotos y documentos de LOG…', 'log-photo-message'));
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 35000);
     try {
-        const response = await fetch(`${LOG_PHOTO_SERVICE}?nv=${encodeURIComponent(nv)}`, {signal: controller.signal, redirect: 'follow'});
-        if (!response.ok) throw new Error('No se pudo consultar LOG.');
-        const result = await response.json();
-        if (!result.success) throw new Error(result.error || 'LOG no devolvió los archivos de esta NV.');
-        if (!Array.isArray(result.datos)) throw new Error('La respuesta de LOG no contiene una lista de archivos válida.');
+        const result = await logFetchPhotos(nv);
         if (!host.isConnected) return;
         const records = result.datos.filter(record => String(record.numeroNV).trim().toUpperCase() === String(nv).trim().toUpperCase() && (!vendor || String(record.vendedor || '').trim().toUpperCase() === vendor));
         logRenderPhotos(host, records);
@@ -1702,7 +1721,7 @@ async function logLoadPhotos(host, nv, vendor) {
         retry.type = 'button';
         retry.onclick = () => logLoadPhotos(host, nv, vendor);
         host.append(retry);
-    } finally { clearTimeout(timeout); }
+    }
 }
 
 function logMountGallery(nv, vendor) {
@@ -1717,6 +1736,159 @@ function logMountGallery(nv, vendor) {
     result.insertBefore(section, exportSection);
     logLoadPhotos(host, nv, vendor);
 }
+
+</script>
+<script>
+// Bounded, vendor-scoped Google Sheets queries; no third-party proxies or demo data.
+const logFastColumns = 'A,B,C,D,E,F,J,K,L,M,N,O,P,Q,AC,AD,AH,AI,AJ,AK,AL,AM,AN,AO';
+const logFastPending = new Map();
+let logFastSequence = 0;
+let logFastView = 0;
+let logFastHasAll = false;
+const logFastCacheKey = `log-nv-v3-${VENDEDOR}`;
+const logFastVendorWhere = `(upper(D) = '${VENDEDOR}' or upper(M) = '${VENDEDOR}')`;
+
+function logFastOwn(row) {
+    return [row[3], row[12]].some(value => String(value || '').trim().toUpperCase() === VENDEDOR);
+}
+function logFastIndex(column) {
+    return [...column].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0) - 1;
+}
+function logFastRows(table) {
+    return (table.rows || []).map(record => {
+        const row = Array(42).fill('');
+        table.cols.forEach((column, index) => {
+            const cell = record.c?.[index];
+            row[logFastIndex(column.id)] = cell?.f ?? cell?.v ?? '';
+        });
+        return row;
+    }).filter(logFastOwn);
+}
+function logFastQuery(where, limit = '') {
+    const query = `select ${logFastColumns} where ${where}${limit ? ' limit ' + limit : ''}`;
+    if (logFastPending.has(query)) return logFastPending.get(query);
+    const promise = new Promise((resolve, reject) => {
+        const callback = `logFast_${Date.now()}_${++logFastSequence}`;
+        const script = document.createElement('script');
+        const cleanup = () => {
+            clearTimeout(timer);
+            script.remove();
+            // A late Google response must not revive an expired query.
+            window[callback] = () => {};
+            setTimeout(() => delete window[callback], 60000);
+        };
+        const timer = setTimeout(() => { cleanup(); reject(new Error('LOG no respondió en 10 segundos. Puedes reintentar.')); }, 10000);
+        window[callback] = response => {
+            cleanup();
+            if (response.status !== 'ok' || !response.table) {
+                reject(new Error('No se pudo consultar la planilla de LOG.')); return;
+            }
+            try { resolve(logFastRows(response.table)); } catch (error) { reject(error); }
+        };
+        script.onerror = () => { cleanup(); reject(new Error('No se pudo conectar con Google Sheets.')); };
+        script.src = 'https://docs.google.com/spreadsheets/d/115hygvTHMNtF0KuQ3AcUgbhjA-WO1Nga3Kjra4wBZX0/gviz/tq?sheet=Registros&headers=1&tq=' + encodeURIComponent(query) + '&tqx=' + encodeURIComponent('out:json;responseHandler:' + callback);
+        document.head.append(script);
+    }).finally(() => logFastPending.delete(query));
+    logFastPending.set(query, promise);
+    return promise;
+}
+function logFastSave() {
+    try { localStorage.setItem(logFastCacheKey, JSON.stringify({time: Date.now(), rows: datosCompletos.slice(0, 150)})); } catch {}
+}
+function logFastRestore() {
+    try {
+        const cached = JSON.parse(localStorage.getItem(logFastCacheKey));
+        if (!cached || !Number.isFinite(cached.time) || !Array.isArray(cached.rows) || Date.now() - cached.time > 86400000) return false;
+        datosCompletos = cached.rows.filter(row => Array.isArray(row) && logFastOwn(row));
+        if (!datosCompletos.length) return false;
+        ultimaActualizacion = new Date(cached.time);
+        actualizarUltimaActualizacion();
+        actualizarEstadoConexion('Datos guardados · actualizando…', 'info');
+        return true;
+    } catch { return false; }
+}
+function logFastError(message) {
+    const host = document.getElementById('resultados');
+    host.replaceChildren(logElement('p', message, 'log-photo-message'));
+    const retry = logElement('button', 'Reintentar conexión');
+    retry.className = 'btn btn-primary';
+    retry.onclick = () => logFastLoad(true);
+    host.append(retry);
+}
+async function logFastLoad(show = true) {
+    const view = logFastView;
+    actualizarEstadoConexion(datosCompletos.length ? 'Actualizando…' : 'Cargando NV recientes…', 'info');
+    if (!datosCompletos.length && show) document.getElementById('resultados').textContent = 'Puedes ingresar una NV mientras se cargan los registros recientes.';
+    try {
+        const rows = await logFastQuery(logFastVendorWhere, 150);
+        const recent = new Set(rows.map(row => String(row[1] || row[10])));
+        datosCompletos = [...rows, ...datosCompletos.filter(row => !recent.has(String(row[1] || row[10])))];
+        ultimaActualizacion = new Date();
+        actualizarUltimaActualizacion();
+        actualizarEstadoConexion(`✅ Listo · ${rows.length} NV recientes`, 'success');
+        logFastSave();
+        if (show && view === logFastView) document.getElementById('resultados').textContent = 'Busca una NV o consulta tus pedidos. Las fotos se cargan al abrir el detalle.';
+    } catch (error) {
+        actualizarEstadoConexion(datosCompletos.length ? 'Sin conexión · datos guardados' : 'Sin conexión', 'error');
+        if (!datosCompletos.length && show && view === logFastView) logFastError(error.message);
+    }
+}
+// Replace the old startup loaders before their window.load handlers execute.
+if (typeof cargarDatos === 'function') cargarDatos = logFastLoad;
+if (typeof cargarDatosOptimizado === 'function') cargarDatosOptimizado = logFastLoad;
+logFastRestore();
+
+buscarNVenDatos = function(nv) {
+    const key = String(nv).trim().toUpperCase();
+    const index = datosCompletos.findIndex(row => logFastOwn(row) && [row[1], row[10]].some(value => String(value || '').trim().toUpperCase() === key));
+    return index < 0 ? {encontrada:false} : {encontrada:true, data:datosCompletos[index], fila:index+2};
+};
+const logFastRenderDetail = typeof mostrarResultadoMejorado === 'function' ? mostrarResultadoMejorado : mostrarResultado;
+buscarNotaVenta = async function() {
+    const nv = document.getElementById('numeroNV').value.trim();
+    if (!nv) { logFastError('Ingresa un número de NV.'); return; }
+    const view = ++logFastView;
+    const found = buscarNVenDatos(nv);
+    if (found.encontrada) { logFastRenderDetail(found); return; }
+    document.getElementById('resultados').textContent = `Buscando NV ${nv}…`;
+    try {
+        // The two NV columns are numeric in the current Sheets query schema.
+        if (!/^\d+$/.test(nv) || nv.length > 15) {
+            logFastError('Esta búsqueda admite números de NV. Para referencias con letras, consulta LOG.'); return;
+        }
+        const number = String(Number(nv));
+        const rows = await logFastQuery(`${logFastVendorWhere} and (B = ${number} or K = ${number})`);
+        if (view !== logFastView) return;
+        if (!rows.length) { document.getElementById('resultados').textContent = `No se encontró la NV ${nv} para el vendedor ${VENDEDOR}.`; return; }
+        datosCompletos.push(...rows);
+        logFastRenderDetail({encontrada:true,data:rows[0]});
+    } catch (error) { if (view === logFastView) logFastError(error.message); }
+};
+for (const name of ['buscarTodasMisNV','buscarPendientes','buscarCompletadas']) {
+    const original = window[name];
+    window[name] = async function() {
+        const view = ++logFastView;
+        if (!logFastHasAll) {
+            document.getElementById('resultados').textContent = 'Cargando las NV de tu vendedor…';
+            try {
+                const rows = await logFastQuery(logFastVendorWhere);
+                datosCompletos = rows;
+                logFastHasAll = true;
+            } catch (error) { if (view === logFastView) logFastError(error.message); return; }
+        }
+        if (view === logFastView) original();
+    };
+}
+// Refresh only in an active tab; hidden tabs should not download the sheet repeatedly.
+toggleAutoRefresh = function() {
+    if (intervalRefresh) clearInterval(intervalRefresh);
+    intervalRefresh = null;
+    if (document.getElementById('autoRefresh').checked) intervalRefresh = setInterval(() => {
+        if (!document.hidden) logFastLoad(false);
+    }, 120000);
+    const next = document.getElementById('proximaActualizacion');
+    if (next) next.textContent = document.getElementById('autoRefresh').checked ? 'Actualización en segundo plano cada 2 minutos' : 'Actualización automática desactivada';
+};
 
 </script>
 </body>
