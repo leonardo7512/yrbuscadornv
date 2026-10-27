@@ -997,7 +997,7 @@
             const entregaConfirmada = data[28] && data[28].toString().trim() !== '';
             
             // Detectar fotos
-            const fotos = detectarFotos(data);
+            // Photo URLs are loaded from LOG after rendering the result.
 
             let html = `
                 <div class="result-container success">
@@ -1099,7 +1099,7 @@
                         `}
                     </div>
 
-                    ${fotos.length > 0 ? generarGaleriaFotos(fotos) : ''}
+                    
 
                     <div class="export-section">
                         <h4>📤 Opciones de Exportación</h4>
@@ -1116,6 +1116,7 @@
             `;
 
             document.getElementById('resultados').innerHTML = html;
+            logMountGallery(String(data[1] || data[10] || '').trim(), VENDEDOR);
         }
 
         // FUNCIÓN PARA FORMATEAR FECHA Y HORA
@@ -1583,5 +1584,141 @@
         `;
         document.head.appendChild(style);
     </script>
+<script>
+// Read photo URLs from LOG's existing service; CSV exports discard HYPERLINK targets.
+const LOG_PHOTO_SERVICE = 'https://script.google.com/macros/s/AKfycbykJ9tPaGxg6436X5D1ZZWfiZhghXwRdB8DfoiO39fuHn9gIs2N6CDLVvGBcS01ZXFS/exec';
+const logPhotoStyle = document.createElement('style');
+logPhotoStyle.textContent = `.log-gallery{margin:24px 0;text-align:left}.log-photo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}.log-photo-card{border:1px solid #dbe3ec;border-radius:12px;padding:12px;background:#fff;min-width:0}.log-photo-card img{width:100%;height:160px;object-fit:contain;background:#f3f5f8;border-radius:8px}.log-photo-card button,.log-gallery button,.log-photo-dialog button{padding:10px 14px;border:0;border-radius:8px;cursor:pointer;background:#1459a6;color:white;margin:6px 6px 6px 0}.log-photo-card a,.log-photo-dialog a{display:inline-block;margin:8px 0;color:#1459a6}.log-photo-card p{overflow-wrap:anywhere}.log-photo-dialog{width:min(1000px,95vw);max-width:95vw;padding:16px;border:0;border-radius:12px}.log-photo-dialog::backdrop{background:#102030ba}.log-photo-dialog iframe{display:block;width:100%;height:70vh;border:0}.log-photo-dialog img{display:block;max-width:100%;max-height:70vh;margin:auto;object-fit:contain}.log-photo-message{padding:14px;background:#f3f5f8;border-radius:10px}.log-photo-top{display:flex;align-items:center;justify-content:space-between;gap:12px}`;
+document.head.append(logPhotoStyle);
+
+function logElement(tag, text, className) {
+    const element = document.createElement(tag);
+    if (text !== undefined) element.textContent = text;
+    if (className) element.className = className;
+    return element;
+}
+
+function logSafeUrl(value) {
+    try {
+        const url = new URL(value);
+        return url.protocol === 'https:' ? url : null;
+    } catch { return null; }
+}
+
+function logDriveId(url) {
+    if (!['drive.google.com', 'docs.google.com'].includes(url.hostname)) return null;
+    const id = url.pathname.match(/\/d\/([\w-]+)/)?.[1] || url.searchParams.get('id');
+    return id && /^[\w-]+$/.test(id) ? id : null;
+}
+
+function logOriginalLink(url) {
+    const link = logElement('a', 'Abrir archivo original ↗');
+    link.href = url.href;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    return link;
+}
+
+function logOpenPhoto(label, url, id, opener) {
+    const dialog = logElement('dialog', undefined, 'log-photo-dialog');
+    const top = logElement('div', undefined, 'log-photo-top');
+    top.append(logElement('strong', label));
+    const close = logElement('button', 'Cerrar');
+    close.type = 'button';
+    close.onclick = () => dialog.close();
+    top.append(close);
+    dialog.append(top, logOriginalLink(url));
+    if (id) {
+        const frame = document.createElement('iframe');
+        frame.src = `https://drive.google.com/file/d/${encodeURIComponent(id)}/preview`;
+        frame.title = label;
+        frame.allowFullscreen = true;
+        dialog.append(frame);
+    } else {
+        const image = document.createElement('img');
+        image.src = url.href;
+        image.alt = label;
+        image.onerror = () => { image.replaceWith(logElement('p', 'Vista previa no disponible. Abre el archivo original.')); };
+        dialog.append(image);
+    }
+    dialog.append(logElement('p', 'Si Drive solicita acceso, abre el archivo original con tu cuenta autorizada.'));
+    dialog.addEventListener('close', () => { dialog.remove(); opener?.focus(); });
+    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+    document.body.append(dialog);
+    dialog.showModal();
+    close.focus();
+}
+
+function logRenderPhotos(host, records) {
+    host.replaceChildren();
+    let count = 0;
+    for (const record of records) {
+        const photos = Object.entries(record.fotos || {}).filter(([, photo]) => logSafeUrl(typeof photo === 'string' ? photo : photo?.url));
+        if (!photos.length) continue;
+        const section = logElement('section');
+        section.append(logElement('h4', `NV ${record.numeroNV || ''} · ${record.vendedor || 'Sin vendedor'} · ${photos.length} archivos`));
+        const grid = logElement('div', undefined, 'log-photo-grid');
+        for (const [name, photo] of photos) {
+            const url = logSafeUrl(typeof photo === 'string' ? photo : photo.url);
+            const id = logDriveId(url);
+            const label = photo.texto && photo.texto !== name ? `${name} · ${photo.texto}` : name;
+            const card = logElement('article', undefined, 'log-photo-card');
+            card.append(logElement('strong', label));
+            const image = document.createElement('img');
+            image.alt = label;
+            image.loading = 'lazy';
+            image.src = id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w600` : url.href;
+            image.onerror = () => image.replaceWith(logElement('p', 'Vista previa no disponible. Puedes abrir el archivo original.'));
+            const open = logElement('button', 'Ampliar');
+            open.type = 'button';
+            open.onclick = () => logOpenPhoto(label, url, id, open);
+            card.append(image, open, logOriginalLink(url));
+            grid.append(card);
+            count++;
+        }
+        section.append(grid);
+        host.append(section);
+    }
+    if (!count) host.append(logElement('p', 'No hay fotos ni documentos disponibles en la respuesta de LOG para esta NV.', 'log-photo-message'));
+}
+
+async function logLoadPhotos(host, nv, vendor) {
+    host.replaceChildren(logElement('p', 'Cargando fotos y documentos de LOG…', 'log-photo-message'));
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 35000);
+    try {
+        const response = await fetch(`${LOG_PHOTO_SERVICE}?nv=${encodeURIComponent(nv)}`, {signal: controller.signal, redirect: 'follow'});
+        if (!response.ok) throw new Error('No se pudo consultar LOG.');
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error || 'LOG no devolvió los archivos de esta NV.');
+        if (!Array.isArray(result.datos)) throw new Error('La respuesta de LOG no contiene una lista de archivos válida.');
+        if (!host.isConnected) return;
+        const records = result.datos.filter(record => String(record.numeroNV).trim().toUpperCase() === String(nv).trim().toUpperCase() && (!vendor || String(record.vendedor || '').trim().toUpperCase() === vendor));
+        logRenderPhotos(host, records);
+    } catch (error) {
+        if (!host.isConnected) return;
+        host.replaceChildren(logElement('p', error.name === 'AbortError' ? 'LOG tardó demasiado en responder. Vuelve a intentar.' : `No se pudieron cargar las fotos: ${error.message}`, 'log-photo-message'));
+        const retry = logElement('button', 'Reintentar fotos');
+        retry.type = 'button';
+        retry.onclick = () => logLoadPhotos(host, nv, vendor);
+        host.append(retry);
+    } finally { clearTimeout(timeout); }
+}
+
+function logMountGallery(nv, vendor) {
+    const result = document.querySelector('#resultados .result-container');
+    if (!result) return;
+    const section = logElement('section', undefined, 'log-gallery');
+    section.append(logElement('h3', '📸 Fotos y documentos de LOG'));
+    const host = logElement('div');
+    host.setAttribute('aria-live', 'polite');
+    section.append(host);
+    const exportSection = result.querySelector('.export-section');
+    result.insertBefore(section, exportSection);
+    logLoadPhotos(host, nv, vendor);
+}
+
+</script>
 </body>
 </html>
+
