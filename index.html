@@ -1668,7 +1668,15 @@ function logRenderPhotos(host, records) {
             image.alt = label;
             image.loading = 'lazy';
             image.src = id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w600` : url.href;
-            image.onerror = () => image.replaceWith(logElement('p', 'Vista previa no disponible. Puedes abrir el archivo original.'));
+            let previewRetried = false;
+            image.onerror = () => {
+                if (!previewRetried && id) {
+                    previewRetried = true;
+                    setTimeout(() => { if (image.isConnected) image.src = `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w600&retry=${Date.now()}`; }, 400);
+                    return;
+                }
+                image.replaceWith(logElement('p', 'Vista previa no disponible. Puedes abrir el archivo original.'));
+            };
             const open = logElement('button', 'Ampliar');
             open.type = 'button';
             open.onclick = () => logOpenPhoto(label, url, id, open);
@@ -1684,24 +1692,37 @@ function logRenderPhotos(host, records) {
 
 const logPhotoCache = new Map();
 const logPhotoRequests = new Map();
-async function logFetchPhotos(nv) {
+async function logFetchPhotos(nv, onRetry = () => {}) {
     const key = String(nv).trim().toUpperCase();
     const cached = logPhotoCache.get(key);
     if (cached && Date.now() - cached.time < 60000) return cached.result;
     if (logPhotoRequests.has(key)) return logPhotoRequests.get(key);
     const request = (async () => {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 25000);
-        try {
-            const response = await fetch(`${LOG_PHOTO_SERVICE}?nv=${encodeURIComponent(nv)}`, {signal:controller.signal,redirect:'follow'});
-            if (!response.ok) throw new Error('No se pudo consultar LOG.');
-            const result = await response.json();
-            if (!result.success) throw new Error(result.error || 'LOG no devolvió los archivos de esta NV.');
-            if (!Array.isArray(result.datos)) throw new Error('La respuesta de LOG no contiene una lista de archivos válida.');
-            logPhotoCache.set(key, {time:Date.now(),result});
-            if (logPhotoCache.size > 30) logPhotoCache.delete(logPhotoCache.keys().next().value);
-            return result;
-        } finally { clearTimeout(timeout); }
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), attempt ? 20000 : 15000);
+            try {
+                const response = await fetch(`${LOG_PHOTO_SERVICE}?nv=${encodeURIComponent(nv)}`, {signal:controller.signal,redirect:'follow'});
+                if (!response.ok) {
+                    const error = new Error('No se pudo consultar LOG.');
+                    error.retryable = response.status === 429 || response.status >= 500;
+                    throw error;
+                }
+                const result = await response.json();
+                if (!result.success || !Array.isArray(result.datos)) {
+                    const error = new Error(result.error || 'LOG no devolvió los archivos de esta NV.');
+                    error.retryable = false;
+                    throw error;
+                }
+                logPhotoCache.set(key, {time:Date.now(),result});
+                if (logPhotoCache.size > 30) logPhotoCache.delete(logPhotoCache.keys().next().value);
+                return result;
+            } catch (error) {
+                if (attempt || error.retryable === false) throw error;
+                onRetry();
+            } finally { clearTimeout(timeout); }
+            await new Promise(resolve => setTimeout(resolve, 600));
+        }
     })().finally(() => logPhotoRequests.delete(key));
     logPhotoRequests.set(key, request);
     return request;
@@ -1710,7 +1731,9 @@ async function logFetchPhotos(nv) {
 async function logLoadPhotos(host, nv, vendor) {
     host.replaceChildren(logElement('p', 'Cargando fotos y documentos de LOG…', 'log-photo-message'));
     try {
-        const result = await logFetchPhotos(nv);
+        const result = await logFetchPhotos(nv, () => {
+            if (host.isConnected) host.replaceChildren(logElement('p', 'Reconectando con LOG para cargar las fotos…', 'log-photo-message'));
+        });
         if (!host.isConnected) return;
         const records = result.datos.filter(record => String(record.numeroNV).trim().toUpperCase() === String(nv).trim().toUpperCase() && (!vendor || String(record.vendedor || '').trim().toUpperCase() === vendor));
         logRenderPhotos(host, records);
@@ -1764,31 +1787,82 @@ function logFastRows(table) {
         return row;
     }).filter(logFastOwn);
 }
+function logFastTransport(query, method, timeout, signal) {
+    const base = 'https://docs.google.com/spreadsheets/d/115hygvTHMNtF0KuQ3AcUgbhjA-WO1Nga3Kjra4wBZX0/gviz/tq?sheet=Registros&headers=1&tq=' + encodeURIComponent(query);
+    if (method === 'fetch') return (async () => {
+        const controller = new AbortController();
+        const abort = () => controller.abort();
+        signal.addEventListener('abort', abort, {once:true});
+        const timer = setTimeout(abort, timeout);
+        try {
+            if (signal.aborted) throw new Error('Consulta cancelada.');
+            const response = await fetch(base + '&tqx=out:json', {signal:controller.signal});
+            if (!response.ok) throw new Error('Google no respondió correctamente.');
+            const text = await response.text();
+            const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);?\s*$/);
+            if (!match) throw new Error('Respuesta de Google no válida.');
+            const result = JSON.parse(match[1]);
+            if (result.status !== 'ok' || !result.table) throw new Error('No se pudo consultar LOG.');
+            return logFastRows(result.table);
+        } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
+    })();
+    return new Promise((resolve, reject) => {
+        const callback = `logFast_${Date.now()}_${++logFastSequence}`;
+        const script = document.createElement('script');
+        let settled = false;
+        const finish = (error, value) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            signal.removeEventListener('abort', abort);
+            script.remove();
+            window[callback] = () => {};
+            setTimeout(() => delete window[callback], 60000);
+            if (error) reject(error); else resolve(value);
+        };
+        const abort = () => finish(new Error('Consulta cancelada.'));
+        const timer = setTimeout(() => finish(new Error('Google tardó demasiado en responder.')), timeout);
+        signal.addEventListener('abort', abort, {once:true});
+        window[callback] = response => {
+            try {
+                if (response.status !== 'ok' || !response.table) throw new Error('No se pudo consultar LOG.');
+                finish(null, logFastRows(response.table));
+            } catch (error) { finish(error); }
+        };
+        script.onerror = () => finish(new Error('No se pudo conectar con Google Sheets.'));
+        script.src = base + '&tqx=' + encodeURIComponent('out:json;responseHandler:' + callback);
+        if (signal.aborted) abort(); else document.head.append(script);
+    });
+}
+async function logFastRound(query, timeout) {
+    const controller = new AbortController();
+    let timer;
+    const alternate = new Promise((resolve, reject) => {
+        const abort = () => { clearTimeout(timer); reject(new Error('Consulta cancelada.')); };
+        controller.signal.addEventListener('abort', abort, {once:true});
+        timer = setTimeout(() => {
+            controller.signal.removeEventListener('abort', abort);
+            logFastTransport(query, 'jsonp', timeout, controller.signal).then(resolve, reject);
+        }, 1200);
+    });
+    try {
+        // Use the first SUCCESS, rather than the first settled/failed connection.
+        return await Promise.any([logFastTransport(query, 'fetch', timeout, controller.signal), alternate]);
+    } finally { controller.abort(); clearTimeout(timer); }
+}
 function logFastQuery(where, limit = '') {
     const query = `select ${logFastColumns} where ${where}${limit ? ' limit ' + limit : ''}`;
     if (logFastPending.has(query)) return logFastPending.get(query);
-    const promise = new Promise((resolve, reject) => {
-        const callback = `logFast_${Date.now()}_${++logFastSequence}`;
-        const script = document.createElement('script');
-        const cleanup = () => {
-            clearTimeout(timer);
-            script.remove();
-            // A late Google response must not revive an expired query.
-            window[callback] = () => {};
-            setTimeout(() => delete window[callback], 60000);
-        };
-        const timer = setTimeout(() => { cleanup(); reject(new Error('LOG no respondió en 10 segundos. Puedes reintentar.')); }, 10000);
-        window[callback] = response => {
-            cleanup();
-            if (response.status !== 'ok' || !response.table) {
-                reject(new Error('No se pudo consultar la planilla de LOG.')); return;
+    const promise = (async () => {
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try { return await logFastRound(query, attempt ? 9000 : 7000); }
+            catch {
+                if (attempt) throw new Error('No se pudo conectar con LOG después de reintentar. Tus datos guardados siguen disponibles.');
+                actualizarEstadoConexion('Reconectando automáticamente…', 'info');
+                await new Promise(resolve => setTimeout(resolve, 700));
             }
-            try { resolve(logFastRows(response.table)); } catch (error) { reject(error); }
-        };
-        script.onerror = () => { cleanup(); reject(new Error('No se pudo conectar con Google Sheets.')); };
-        script.src = 'https://docs.google.com/spreadsheets/d/115hygvTHMNtF0KuQ3AcUgbhjA-WO1Nga3Kjra4wBZX0/gviz/tq?sheet=Registros&headers=1&tq=' + encodeURIComponent(query) + '&tqx=' + encodeURIComponent('out:json;responseHandler:' + callback);
-        document.head.append(script);
-    }).finally(() => logFastPending.delete(query));
+        }
+    })().finally(() => logFastPending.delete(query));
     logFastPending.set(query, promise);
     return promise;
 }
@@ -1807,12 +1881,12 @@ function logFastRestore() {
         return true;
     } catch { return false; }
 }
-function logFastError(message) {
+function logFastError(message, retryAction = () => logFastLoad(true)) {
     const host = document.getElementById('resultados');
     host.replaceChildren(logElement('p', message, 'log-photo-message'));
     const retry = logElement('button', 'Reintentar conexión');
     retry.className = 'btn btn-primary';
-    retry.onclick = () => logFastLoad(true);
+    retry.onclick = retryAction;
     host.append(retry);
 }
 async function logFastLoad(show = true) {
@@ -1862,7 +1936,7 @@ buscarNotaVenta = async function() {
         if (!rows.length) { document.getElementById('resultados').textContent = `No se encontró la NV ${nv} para el vendedor ${VENDEDOR}.`; return; }
         datosCompletos.push(...rows);
         logFastRenderDetail({encontrada:true,data:rows[0]});
-    } catch (error) { if (view === logFastView) logFastError(error.message); }
+    } catch (error) { if (view === logFastView) logFastError(error.message, buscarNotaVenta); }
 };
 for (const name of ['buscarTodasMisNV','buscarPendientes','buscarCompletadas']) {
     const original = window[name];
@@ -1874,7 +1948,7 @@ for (const name of ['buscarTodasMisNV','buscarPendientes','buscarCompletadas']) 
                 const rows = await logFastQuery(logFastVendorWhere);
                 datosCompletos = rows;
                 logFastHasAll = true;
-            } catch (error) { if (view === logFastView) logFastError(error.message); return; }
+            } catch (error) { if (view === logFastView) logFastError(error.message, () => window[name]()); return; }
         }
         if (view === logFastView) original();
     };
@@ -1889,6 +1963,17 @@ toggleAutoRefresh = function() {
     const next = document.getElementById('proximaActualizacion');
     if (next) next.textContent = document.getElementById('autoRefresh').checked ? 'Actualización en segundo plano cada 2 minutos' : 'Actualización automática desactivada';
 };
+
+// Recover when a suspended browser tab or the network comes back.
+let logFastReconnectAt = 0;
+function logFastReconnect() {
+    const status = document.getElementById('estadoConexion')?.textContent || '';
+    if (document.hidden || Date.now() - logFastReconnectAt < 15000 || !/Sin conexión/.test(status)) return;
+    logFastReconnectAt = Date.now();
+    logFastLoad(false);
+}
+window.addEventListener('online', logFastReconnect);
+document.addEventListener('visibilitychange', logFastReconnect);
 
 </script>
 </body>
